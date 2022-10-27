@@ -1,23 +1,18 @@
-/* Edge Impulse inferencing library
+/*
  * Copyright (c) 2022 EdgeImpulse Inc.
  *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
  *
- * The above copyright notice and this permission notice shall be included in
- * all copies or substantial portions of the Software.
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an "AS
+ * IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
+ * express or implied. See the License for the specific language
+ * governing permissions and limitations under the License.
  *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
+ * SPDX-License-Identifier: Apache-2.0
  */
 
 #ifndef _EI_CLASSIFIER_INFERENCING_ENGINE_TENSAILFOW_H_
@@ -36,24 +31,26 @@
 
 #include "mcu.h"
 
-extern "C" void infer(uint32_t* time, uint32_t* cycles);
+extern "C" void infer(const void *impulse_arg, uint32_t* time, uint32_t* cycles);
 int8_t *processed_features;
-int8_t infer_result[EI_CLASSIFIER_LABEL_COUNT];
+int8_t infer_result[EI_CLASSIFIER_MAX_LABELS_COUNT];
 
-extern "C" void get_data(int8_t *in_buf_0, uint16_t in_buf_0_dim_0, uint16_t in_buf_0_dim_1, uint16_t in_buf_0_dim_2)
+extern "C" void get_data(const void *impulse_arg, int8_t *in_buf_0, uint16_t in_buf_0_dim_0, uint16_t in_buf_0_dim_1, uint16_t in_buf_0_dim_2)
 {
-#if EI_CLASSIFIER_SENSOR == EI_CLASSIFIER_SENSOR_CAMERA
+    ei_impulse_t *impulse = (ei_impulse_t *) impulse_arg;
 
-    if (ei_dsp_blocks_size == 1 || ei_dsp_blocks[0].extract_fn == extract_image_features) {
-        memcpy(in_buf_0, processed_features, EI_CLASSIFIER_NN_INPUT_FRAME_SIZE);
+    if ((impulse->sensor == EI_CLASSIFIER_SENSOR_CAMERA) &&
+        ((ei_dsp_blocks_size == 1) ||
+        (ei_dsp_blocks[0].extract_fn == extract_image_features))) {
+
+        memcpy(in_buf_0, processed_features, impulse->nn_input_frame_size);
     }
-
-#endif
 }
 
-extern "C" void post_process(int8_t *out_buf_0, int8_t *out_buf_1)
+extern "C" void post_process(const void *impulse_arg, int8_t *out_buf_0, int8_t *out_buf_1)
 {
-    memcpy(infer_result, out_buf_0, EI_CLASSIFIER_LABEL_COUNT);
+    ei_impulse_t *impulse = (ei_impulse_t *) impulse_arg;
+    memcpy(infer_result, out_buf_0, impulse->label_count);
 }
 
 /**
@@ -71,11 +68,16 @@ EI_IMPULSE_ERROR run_nn_inference(
     ei_impulse_result_t *result,
     bool debug = false)
 {
+    if (impulse->object_detection) {
+        ei_printf("ERR: Object detection models are not supported with TensaiFlow\n");
+        return EI_IMPULSE_UNSUPPORTED_INFERENCING_ENGINE;
+    }
+
     uint64_t ctx_start_us = ei_read_timer_us();
     uint32_t time, cycles;
 
     /* Run tensaiflow inference */
-    infer(&time, &cycles);
+    infer((const void *)impulse, &time, &cycles);
 
     // Inference results returned by post_process() and copied into infer_results
 
@@ -146,7 +148,7 @@ EI_IMPULSE_ERROR run_nn_inference_image_quantized(
     ctx_start_us = ei_read_timer_us();
 
     /* Run tensaiflow inference */
-    infer(&time, &cycles);
+    infer((const void *)impulse, &time, &cycles);
 
     // Inference results returned by post_process() and copied into infer_results
 

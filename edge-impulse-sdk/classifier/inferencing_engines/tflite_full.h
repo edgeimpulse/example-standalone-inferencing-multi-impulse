@@ -1,23 +1,18 @@
-/* Edge Impulse inferencing library
+/*
  * Copyright (c) 2022 EdgeImpulse Inc.
  *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
  *
- * The above copyright notice and this permission notice shall be included in
- * all copies or substantial portions of the Software.
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an "AS
+ * IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
+ * express or implied. See the License for the specific language
+ * governing permissions and limitations under the License.
  *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
+ * SPDX-License-Identifier: Apache-2.0
  */
 
 #ifndef _EI_CLASSIFIER_INFERENCING_ENGINE_TFLITE_FULL_H_
@@ -50,7 +45,7 @@ extern "C" EI_IMPULSE_ERROR run_nn_inference(
     static std::unique_ptr<tflite::Interpreter> interpreter = nullptr;
 
     if (!model) {
-        model = tflite::FlatBufferModel::BuildFromBuffer((const char*)impulse->tflite_file, impulse->tflite_file_size);
+        model = tflite::FlatBufferModel::BuildFromBuffer((const char*)impulse->model_arr, impulse->model_arr_size);
         if (!model) {
             ei_printf("Failed to build TFLite model from buffer\n");
             return EI_IMPULSE_TFLITE_ERROR;
@@ -134,29 +129,54 @@ extern "C" EI_IMPULSE_ERROR run_nn_inference(
         ei_printf("Predictions (time: %d ms.):\n", result->timing.classification);
     }
 
-    if (impulse->object_detection == EI_OBJECT_DETECTION_FOMO) {
-#if EI_CLASSIFIER_TFLITE_OUTPUT_QUANTIZED == 1
-        fill_result_struct_i8_fomo(impulse, result, out_data, impulse->tflite_output_zeropoint, impulse->tflite_output_scale,
-            impulse->input_width / 8, impulse->input_height / 8);
-#else
-        fill_result_struct_f32_fomo(impulse, result, out_data,
-            impulse->input_width / 8, impulse->input_height / 8);
-#endif
-    }
-    else if (impulse->object_detection == EI_OBJECT_DETECTION_SSD) {
-        float *scores_tensor = interpreter->typed_output_tensor<float>(impulse->tflite_output_score_tensor);
-        float *label_tensor = interpreter->typed_output_tensor<float>(impulse->tflite_output_labels_tensor);
-        if (!scores_tensor) {
-            return EI_IMPULSE_SCORE_TENSOR_WAS_NULL;
+    if (impulse->object_detection) {
+        switch (impulse->object_detection_last_layer) {
+            case EI_CLASSIFIER_LAST_LAYER_FOMO: {
+                #if EI_CLASSIFIER_TFLITE_OUTPUT_QUANTIZED == 1
+                    fill_result_struct_i8_fomo(impulse, result, out_data, impulse->tflite_output_zeropoint, impulse->tflite_output_scale,
+                        impulse->input_width / 8, impulse->input_height / 8);
+                #else
+                    fill_result_struct_f32_fomo(impulse, result, out_data,
+                        impulse->input_width / 8, impulse->input_height / 8);
+                #endif
+                break;
+            }
+            case EI_CLASSIFIER_LAST_LAYER_SSD: {
+                float *scores_tensor = interpreter->typed_output_tensor<float>(impulse->tflite_output_score_tensor);
+                float *label_tensor = interpreter->typed_output_tensor<float>(impulse->tflite_output_labels_tensor);
+                if (!scores_tensor) {
+                    return EI_IMPULSE_SCORE_TENSOR_WAS_NULL;
+                }
+                if (!label_tensor) {
+                    return EI_IMPULSE_LABEL_TENSOR_WAS_NULL;
+                }
+                #if EI_CLASSIFIER_TFLITE_OUTPUT_QUANTIZED == 1
+                    ei_printf("ERR: MobileNet SSD does not support quantized inference\n");
+                    return EI_IMPULSE_UNSUPPORTED_INFERENCING_ENGINE;
+                #else
+                    fill_result_struct_f32_object_detection(impulse, result, out_data, scores_tensor, label_tensor, debug);
+                #endif
+                break;
+            }
+            case EI_CLASSIFIER_LAST_LAYER_YOLOV5: {
+                #if EI_CLASSIFIER_TFLITE_OUTPUT_QUANTIZED == 1
+                    ei_printf("ERR: YOLOv5 does not support quantized inference\n");
+                    return EI_IMPULSE_UNSUPPORTED_INFERENCING_ENGINE;
+                #else
+                    fill_result_struct_f32_yolov5(
+                        impulse,
+                        result,
+                        out_data,
+                        impulse->tflite_output_features_count);
+                #endif
+                break;
+            }
+            default: {
+                ei_printf("ERR: Unsupported object detection last layer (%d)\n",
+                    impulse->object_detection_last_layer);
+                break;
+            }
         }
-        if (!label_tensor) {
-            return EI_IMPULSE_LABEL_TENSOR_WAS_NULL;
-        }
-#if EI_CLASSIFIER_TFLITE_OUTPUT_QUANTIZED == 1
-        ei_printf("ERR: MobileNet SSD does not support quantized inference.");
-#else
-        fill_result_struct_f32_object_detection(impulse, result, out_data, scores_tensor, label_tensor, debug);
-#endif
     }
     else {
 #if EI_CLASSIFIER_TFLITE_OUTPUT_QUANTIZED == 1

@@ -85,16 +85,18 @@ const ei_impulse_t impulse_acc = {
     .dsp_blocks_size = 1,
     .dsp_blocks = ei_dsp_blocks_acc,
 
-    .object_detection = EI_OBJECT_DETECTION_NONE,
+    .object_detection = false,
     .object_detection_count = 0,
     .object_detection_threshold = 0.0,
+    .object_detection_last_layer = EI_CLASSIFIER_LAST_LAYER_UNKNOWN,
     .tflite_output_labels_tensor = 0,
     .tflite_output_score_tensor = 0,
     .tflite_output_data_tensor = 0,
+    .tflite_output_features_count = 4,
 
     .tflite_arena_size = 2598,
-    .tflite_file = trained_tflite_acc,
-    .tflite_file_size = trained_tflite_acc_len,
+    .model_arr = trained_tflite_acc,
+    .model_arr_size = trained_tflite_acc_len,
 
     .tflite_input_datatype = EI_CLASSIFIER_DATATYPE_INT8,
     .tflite_input_quantized = true,
@@ -173,16 +175,18 @@ const ei_impulse_t impulse_mic = {
     .dsp_blocks_size = 1,
     .dsp_blocks = ei_dsp_blocks_mic,
 
-    .object_detection = EI_OBJECT_DETECTION_NONE,
+    .object_detection = false,
     .object_detection_count = 0,
     .object_detection_threshold = 0.0,
+    .object_detection_last_layer = EI_CLASSIFIER_LAST_LAYER_UNKNOWN,
     .tflite_output_labels_tensor = 0,
     .tflite_output_score_tensor = 0,
     .tflite_output_data_tensor = 0,
+    .tflite_output_features_count = 3,
 
     .tflite_arena_size = 11468,
-    .tflite_file = trained_tflite_mic,
-    .tflite_file_size = trained_tflite_mic_len,
+    .model_arr = trained_tflite_mic,
+    .model_arr_size = trained_tflite_mic_len,
 
     .tflite_input_datatype = EI_CLASSIFIER_DATATYPE_INT8,
     .tflite_input_quantized = true,
@@ -214,6 +218,7 @@ const ei_impulse_t ei_default_impulse = impulse_acc;
 
 const ei_model_performance_calibration_t ei_calibration = {
     1, /* integer version number */
+    true,
     926, /* average duration window ms */
     0.9209751525297545, /* detection threshold */
     753,  /* suppression ms */

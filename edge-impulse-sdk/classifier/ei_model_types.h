@@ -1,23 +1,18 @@
-/* Edge Impulse inferencing library
- * Copyright (c) 2021 EdgeImpulse Inc.
+/*
+ * Copyright (c) 2022 EdgeImpulse Inc.
  *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
  *
- * The above copyright notice and this permission notice shall be included in
- * all copies or substantial portions of the Software.
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an "AS
+ * IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
+ * express or implied. See the License for the specific language
+ * governing permissions and limitations under the License.
  *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
+ * SPDX-License-Identifier: Apache-2.0
  */
 
 #ifndef _EDGE_IMPULSE_MODEL_TYPES_H_
@@ -27,9 +22,6 @@
 
 #include "edge-impulse-sdk/dsp/numpy.hpp"
 #include "edge-impulse-sdk/tensorflow/lite/c/common.h"
-
-#define EI_NEURAL_NETWORK                       0
-#define EI_K_MEANS                              1
 
 #define EI_CLASSIFIER_NONE                       255
 #define EI_CLASSIFIER_UTENSOR                    1
@@ -52,16 +44,16 @@
 #define EI_CLASSIFIER_DATATYPE_FLOAT32           1
 #define EI_CLASSIFIER_DATATYPE_INT8              9
 
-struct ei_impulse;
+#define EI_CLASSIFIER_LAST_LAYER_UNKNOWN         -1
+#define EI_CLASSIFIER_LAST_LAYER_SSD             1
+#define EI_CLASSIFIER_LAST_LAYER_FOMO            2
+#define EI_CLASSIFIER_LAST_LAYER_YOLOV5          3
 
-enum object_detection_types {
-    EI_OBJECT_DETECTION_NONE,
-    EI_OBJECT_DETECTION_SSD,
-    EI_OBJECT_DETECTION_FOMO
-};
+struct ei_impulse;
 
 typedef struct {
     uint16_t implementation_version;
+    bool is_configured;
     uint32_t average_window_duration_ms;
     float detection_threshold;
     uint32_t suppression_ms;
@@ -99,16 +91,18 @@ typedef struct ei_impulse {
     size_t dsp_blocks_size;
     ei_model_dsp_t *dsp_blocks;
 
-    object_detection_types object_detection;
+    bool object_detection;
     uint16_t object_detection_count;
     float object_detection_threshold;
+    int8_t object_detection_last_layer;
     uint8_t tflite_output_labels_tensor;
     uint8_t tflite_output_score_tensor;
     uint8_t tflite_output_data_tensor;
+    uint32_t tflite_output_features_count;
 
     uint32_t tflite_arena_size;
-    const uint8_t *tflite_file;
-    size_t tflite_file_size;
+    const uint8_t *model_arr;
+    size_t model_arr_size;
     uint8_t tflite_input_datatype;
     bool tflite_input_quantized;
     float tflite_input_scale;

@@ -1,23 +1,18 @@
-/* Edge Impulse inferencing library
+/*
  * Copyright (c) 2022 EdgeImpulse Inc.
  *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
  *
- * The above copyright notice and this permission notice shall be included in
- * all copies or substantial portions of the Software.
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an "AS
+ * IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
+ * express or implied. See the License for the specific language
+ * governing permissions and limitations under the License.
  *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
+ * SPDX-License-Identifier: Apache-2.0
  */
 
 #ifndef _EI_CLASSIFIER_FILL_RESULT_STRUCT_H_
@@ -238,8 +233,19 @@ __attribute__((unused)) static void fill_result_struct_f32_object_detection(cons
             if (yend < ystart) yend = ystart;
 
             if (debug) {
-                ei_printf("%s (%f): %f [ %f, %f, %f, %f ]\n",
-                    impulse->categories[(uint32_t)label], label, score, xstart, ystart, xend, yend);
+                ei_printf("%s (", impulse->categories[(uint32_t)label]);
+                ei_printf_float(label);
+                ei_printf("): ");
+                ei_printf_float(score);
+                ei_printf(" [ ");
+                ei_printf_float(xstart);
+                ei_printf(", ");
+                ei_printf_float(ystart);
+                ei_printf(", ");
+                ei_printf_float(xend);
+                ei_printf(", ");
+                ei_printf_float(yend);
+                ei_printf(" ]\n");
             }
 
             results[ix].label = impulse->categories[(uint32_t)label];
@@ -290,5 +296,69 @@ __attribute__((unused)) static void fill_result_struct_f32(const ei_impulse_t *i
         result->classification[ix].value = value;
     }
 }
+
+/**
+  * Fill the result structure from an unquantized output tensor
+  * (we don't support quantized here a.t.m.)
+  */
+__attribute__((unused)) static void fill_result_struct_f32_yolov5(const ei_impulse_t *impulse, ei_impulse_result_t *result, float *data, size_t output_features_count) {
+    static std::vector<ei_impulse_result_bounding_box_t> results;
+    results.clear();
+
+    size_t col_size = 5 + impulse->label_count;
+    size_t row_count = output_features_count / col_size;
+
+    for (size_t ix = 0; ix < row_count; ix++) {
+        size_t base_ix = ix * col_size;
+        float xc = data[base_ix + 0];
+        float yc = data[base_ix + 1];
+        float w = data[base_ix + 2];
+        float h = data[base_ix + 3];
+        float x = xc - (w / 2.0f);
+        float y = yc - (h / 2.0f);
+        if (x < 0) {
+            x = 0;
+        }
+        if (y < 0) {
+            y = 0;
+        }
+        if (x + w > impulse->input_width) {
+            w = impulse->input_width - x;
+        }
+        if (y + h > impulse->input_height) {
+            h = impulse->input_height - y;
+        }
+
+        if (w < 0 || h < 0) {
+            continue;
+        }
+
+        float score = data[base_ix + 4];
+
+        uint32_t label = 0;
+        for (size_t lx = 0; lx < impulse->label_count; lx++) {
+            float l = data[base_ix + 5 + lx];
+            if (l > 0.5f) {
+                label = lx;
+                break;
+            }
+        }
+
+        if (score >= impulse->object_detection_threshold && score <= 1.0f) {
+            ei_impulse_result_bounding_box_t r;
+            r.label = ei_classifier_inferencing_categories[label];
+            r.x = static_cast<uint32_t>(x * static_cast<float>(impulse->input_width));
+            r.y = static_cast<uint32_t>(y * static_cast<float>(impulse->input_height));
+            r.width = static_cast<uint32_t>(w * static_cast<float>(impulse->input_width));
+            r.height = static_cast<uint32_t>(h * static_cast<float>(impulse->input_height));
+            r.value = score;
+            results.push_back(r);
+        }
+    }
+
+    result->bounding_boxes = results.data();
+    result->bounding_boxes_count = results.size();
+}
+
 
 #endif // _EI_CLASSIFIER_FILL_RESULT_STRUCT_H_

@@ -1,23 +1,18 @@
-/* Edge Impulse inferencing library
+/*
  * Copyright (c) 2022 EdgeImpulse Inc.
  *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
  *
- * The above copyright notice and this permission notice shall be included in
- * all copies or substantial portions of the Software.
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an "AS
+ * IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
+ * express or implied. See the License for the specific language
+ * governing permissions and limitations under the License.
  *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
+ * SPDX-License-Identifier: Apache-2.0
  */
 
 #ifndef _EDGE_IMPULSE_RUN_CLASSIFIER_H_
@@ -55,8 +50,8 @@
 #endif
 
 #if (EI_CLASSIFIER_INFERENCING_ENGINE == EI_CLASSIFIER_TFLITE) && (EI_CLASSIFIER_COMPILED != 1)
-#include "edge-impulse-sdk/classifier/inferencing_engines/tflite_micro.h"
 #include "tflite-model/tflite-trained.h"
+#include "edge-impulse-sdk/classifier/inferencing_engines/tflite_micro.h"
 #elif EI_CLASSIFIER_COMPILED == 1
 #include "edge-impulse-sdk/classifier/inferencing_engines/tflite_eon.h"
 #elif EI_CLASSIFIER_INFERENCING_ENGINE == EI_CLASSIFIER_TFLITE_FULL
@@ -64,6 +59,7 @@
 #include "tflite-model/tflite-trained.h"
 #elif (EI_CLASSIFIER_INFERENCING_ENGINE == EI_CLASSIFIER_TENSORRT)
 #include "edge-impulse-sdk/classifier/inferencing_engines/tensorrt.h"
+#include "tflite-model/onnx-trained.h"
 #elif EI_CLASSIFIER_INFERENCING_ENGINE == EI_CLASSIFIER_TENSAIFLOW
 #include "edge-impulse-sdk/classifier/inferencing_engines/tensaiflow.h"
 #elif EI_CLASSIFIER_INFERENCING_ENGINE == EI_CLASSIFIER_DRPAI
@@ -79,7 +75,7 @@ void*   __dso_handle = (void*) &__dso_handle;
 #endif
 
 // EI_CLASSIFIER_CALIBRATION_ENABLED needs to be added to new
-// model metadata, since we are getting rid of macro for sensors 
+// model metadata, since we are getting rid of macro for sensors
 // (multiple impulses means we can have multiple sensors)
 // for now we just enable it if EI_CLASSIFIER_SENSOR is present and
 // is microphone (performance calibration only works for mic).
@@ -88,9 +84,6 @@ void*   __dso_handle = (void*) &__dso_handle;
 #else
 #define EI_CLASSIFIER_CALIBRATION_ENABLED 0
 #endif
-
-// I cannot find it anywhere in code now. Can delete?
-#define EI_CLASSIFIER_OBJDET_HAS_SCORE_TENSOR   (EI_CLASSIFIER_OBJECT_DETECTION && !(EI_CLASSIFIER_OBJECT_DETECTION_CONSTRAINED))
 
 #ifdef __cplusplus
 namespace {
@@ -108,7 +101,7 @@ static RecognizeEvents *avg_scores = NULL;
 
 /* Private functions ------------------------------------------------------- */
 
-/* These functions (up to Public functions section) are not exposed to end-user, 
+/* These functions (up to Public functions section) are not exposed to end-user,
 therefore changes are allowed. */
 
 /**
@@ -160,7 +153,7 @@ extern "C" EI_IMPULSE_ERROR run_inference(
  *
  * @return     The ei impulse error.
  */
-extern "C" EI_IMPULSE_ERROR process_impulse(const ei_impulse_t *impulse, 
+extern "C" EI_IMPULSE_ERROR process_impulse(const ei_impulse_t *impulse,
                                             signal_t *signal,
                                             ei_impulse_result_t *result,
                                             bool debug = false)
@@ -244,7 +237,7 @@ extern "C" EI_IMPULSE_ERROR process_impulse(const ei_impulse_t *impulse,
  *
  * @return     The ei impulse error.
  */
-extern "C" EI_IMPULSE_ERROR process_impulse_continuous(const ei_impulse_t *impulse, 
+extern "C" EI_IMPULSE_ERROR process_impulse_continuous(const ei_impulse_t *impulse,
                                             signal_t *signal,
                                             ei_impulse_result_t *result,
                                             bool debug,
@@ -255,6 +248,8 @@ extern "C" EI_IMPULSE_ERROR process_impulse_continuous(const ei_impulse_t *impul
     if (!static_features_matrix.buffer) {
         return EI_IMPULSE_ALLOC_FAILED;
     }
+
+    memset(result, 0, sizeof(ei_impulse_result_t));
 
     EI_IMPULSE_ERROR ei_impulse_error = EI_IMPULSE_OK;
 
@@ -362,13 +357,53 @@ extern "C" EI_IMPULSE_ERROR process_impulse_continuous(const ei_impulse_t *impul
 
         ei_impulse_error = run_inference(impulse, &classify_matrix, result, debug);
 
-    if (impulse->sensor == EI_CLASSIFIER_SENSOR_MICROPHONE) {
-            if((void *)avg_scores  != NULL && enable_maf == true) {
-                result->label_detected = avg_scores->trigger(result->classification);
+#if EI_CLASSIFIER_CALIBRATION_ENABLED
+        if (impulse->sensor == EI_CLASSIFIER_SENSOR_MICROPHONE) {
+            if((void *)avg_scores != NULL && enable_maf == true) {
+                if (enable_maf && !ei_calibration.is_configured) {
+                    // perfcal is not configured, print msg first time
+                    static bool has_printed_msg = false;
+
+                    if (!has_printed_msg) {
+                        ei_printf("WARN: run_classifier_continuous, enable_maf is true, but performance calibration is not configured.\n");
+                        ei_printf("       Previously we'd run a moving-average filter over your outputs in this case, but this is now disabled.\n");
+                        ei_printf("       Go to 'Performance calibration' in your Edge Impulse project to configure post-processing parameters.\n");
+                        ei_printf("       (You can enable this from 'Dashboard' if it's not visible in your project)\n");
+                        ei_printf("\n");
+
+                        has_printed_msg = true;
+                    }
+                }
+                else {
+                    // perfcal is configured
+                    int label_detected = avg_scores->trigger(result->classification);
+
+                    if (avg_scores->should_boost()) {
+                        for (int i = 0; i < impulse->label_count; i++) {
+                            if (i == label_detected) {
+                                result->classification[i].value = 1.0f;
+                            }
+                            else {
+                                result->classification[i].value = 0.0f;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+#endif
+    }
+    else {
+        if (!impulse->object_detection) {
+            for (int i = 0; i < impulse->label_count; i++) {
+                // set label correctly in the result struct if we have no results (otherwise is nullptr)
+                result->classification[i].label = impulse->categories[(uint32_t)i];
             }
         }
     }
+
     return ei_impulse_error;
+
 
 }
 
@@ -379,7 +414,7 @@ extern "C" EI_IMPULSE_ERROR process_impulse_continuous(const ei_impulse_t *impul
 extern "C" const ei_impulse_t ei_construct_impulse()
 {
 
-const ei_impulse_t impulse = 
+const ei_impulse_t impulse =
     {
     .project_id = EI_CLASSIFIER_PROJECT_ID,
     .project_owner = EI_CLASSIFIER_PROJECT_OWNER,
@@ -404,19 +439,27 @@ const ei_impulse_t impulse =
     .dsp_blocks = ei_dsp_blocks,
 
 #if EI_CLASSIFIER_OBJECT_DETECTION == 1
-    .object_detection = (object_detection_types)(EI_CLASSIFIER_OBJECT_DETECTION + EI_CLASSIFIER_OBJECT_DETECTION_CONSTRAINED),
+    .object_detection = true,
     .object_detection_count = EI_CLASSIFIER_OBJECT_DETECTION_COUNT,
     .object_detection_threshold = EI_CLASSIFIER_OBJECT_DETECTION_THRESHOLD,
+    .object_detection_last_layer = EI_CLASSIFIER_OBJECT_DETECTION_LAST_LAYER,
     .tflite_output_labels_tensor = EI_CLASSIFIER_TFLITE_OUTPUT_LABELS_TENSOR,
     .tflite_output_score_tensor = EI_CLASSIFIER_TFLITE_OUTPUT_SCORE_TENSOR,
     .tflite_output_data_tensor = EI_CLASSIFIER_TFLITE_OUTPUT_DATA_TENSOR,
 #else
-    .object_detection = EI_OBJECT_DETECTION_NONE,
+    .object_detection = false,
     .object_detection_count = 0,
     .object_detection_threshold = 0.0,
+    .object_detection_last_layer = EI_CLASSIFIER_LAST_LAYER_UNKNOWN,
     .tflite_output_labels_tensor = 0,
     .tflite_output_score_tensor = 0,
     .tflite_output_data_tensor = 0,
+#endif
+
+#ifdef EI_CLASSIFIER_NN_OUTPUT_COUNT
+    .tflite_output_features_count = EI_CLASSIFIER_NN_OUTPUT_COUNT,
+#else
+    .tflite_output_features_count = 0,
 #endif
 
 #if (EI_CLASSIFIER_INFERENCING_ENGINE == EI_CLASSIFIER_TFLITE) && (EI_CLASSIFIER_COMPILED != 1)
@@ -426,11 +469,14 @@ const ei_impulse_t impulse =
 #endif
 
 #if ((EI_CLASSIFIER_INFERENCING_ENGINE == EI_CLASSIFIER_TFLITE) || (EI_CLASSIFIER_INFERENCING_ENGINE == EI_CLASSIFIER_TFLITE_FULL)) && (EI_CLASSIFIER_COMPILED != 1)
-    .tflite_file = trained_tflite,
-    .tflite_file_size = trained_tflite_len,
+    .model_arr = trained_tflite,
+    .model_arr_size = trained_tflite_len,
+#elif (EI_CLASSIFIER_INFERENCING_ENGINE == EI_CLASSIFIER_TENSORRT)
+    .model_arr = trained_onnx,
+    .model_arr_size = trained_onnx_len,
 #else
-    .tflite_file = 0,
-    .tflite_file_size = 0,
+    .model_arr = 0,
+    .model_arr_size = 0,
 #endif
 
 #if (EI_CLASSIFIER_INFERENCING_ENGINE != EI_CLASSIFIER_NONE)
@@ -470,19 +516,19 @@ const ei_impulse_t impulse =
     .slices_per_model_window = EI_CLASSIFIER_SLICES_PER_MODEL_WINDOW,
 
 #if (EI_CLASSIFIER_INFERENCING_ENGINE == EI_CLASSIFIER_TFLITE) && (EI_CLASSIFIER_COMPILED == 1)
-    &trained_model_input,
-    &trained_model_output,
-    &trained_model_init,
-    &trained_model_invoke,
-    &trained_model_reset,
+    .model_input = &trained_model_input,
+    .model_output = &trained_model_output,
+    .model_init = &trained_model_init,
+    .model_invoke = &trained_model_invoke,
+    .model_reset = &trained_model_reset,
 #else
-    NULL,
-    NULL,
-    NULL,
-    NULL,
-    NULL,
+    .model_input = NULL,
+    .model_output = NULL,
+    .model_init =  NULL,
+    .model_invoke = NULL,
+    .model_reset = NULL,
 #endif
-    ei_classifier_inferencing_categories
+    .categories = ei_classifier_inferencing_categories
     };
 
     return impulse;
@@ -563,7 +609,7 @@ extern "C" void run_classifier_init()
 #if EI_CLASSIFIER_STUDIO_VERSION < 3
         const ei_impulse_t impulse = ei_construct_impulse();
 #else
-       const ei_impulse_t impulse = ei_default_impulse; 
+       const ei_impulse_t impulse = ei_default_impulse;
 #endif
 
     const ei_model_performance_calibration_t *calibration = &ei_calibration;
@@ -578,7 +624,7 @@ extern "C" void run_classifier_init()
 /**
  * @brief      Init static vars, for multi-model support
  */
-void run_classifier_init(const ei_impulse_t *impulse)
+__attribute__((unused)) void run_classifier_init(const ei_impulse_t *impulse)
 {
     classifier_continuous_features_written = 0;
     ei_dsp_clear_continuous_audio_state();
@@ -619,7 +665,7 @@ extern "C" EI_IMPULSE_ERROR run_classifier_continuous(
 #if EI_CLASSIFIER_STUDIO_VERSION < 3
         const ei_impulse_t impulse = ei_construct_impulse();
 #else
-       const ei_impulse_t impulse = ei_default_impulse; 
+       const ei_impulse_t impulse = ei_default_impulse;
 #endif
     return process_impulse_continuous(&impulse, signal, result, debug, enable_maf);
 }
@@ -627,7 +673,7 @@ extern "C" EI_IMPULSE_ERROR run_classifier_continuous(
 /**
  * @brief      Fill the complete matrix with sample slices. From there, run impulse
  *             on the matrix.
- * 
+ *
  * @param      impulse struct with information about model and DSP
  * @param      signal  Sample data
  * @param      result  Classification output
@@ -635,7 +681,7 @@ extern "C" EI_IMPULSE_ERROR run_classifier_continuous(
  *
  * @return     The ei impulse error.
  */
-EI_IMPULSE_ERROR run_classifier_continuous(
+__attribute__((unused)) EI_IMPULSE_ERROR run_classifier_continuous(
     const ei_impulse_t *impulse,
     signal_t *signal,
     ei_impulse_result_t *result,
@@ -660,7 +706,7 @@ extern "C" EI_IMPULSE_ERROR run_classifier(
 #if EI_CLASSIFIER_STUDIO_VERSION < 3
         const ei_impulse_t impulse = ei_construct_impulse();
 #else
-       const ei_impulse_t impulse = ei_default_impulse; 
+       const ei_impulse_t impulse = ei_default_impulse;
 #endif
     return process_impulse(&impulse, signal, result, debug);
 }
@@ -673,7 +719,7 @@ extern "C" EI_IMPULSE_ERROR run_classifier(
  * @param result Object to store the results in
  * @param debug Whether to show debug messages (default: false)
  */
-EI_IMPULSE_ERROR run_classifier(
+__attribute__((unused)) EI_IMPULSE_ERROR run_classifier(
     const ei_impulse_t *impulse,
     signal_t *signal,
     ei_impulse_result_t *result,
@@ -685,7 +731,7 @@ EI_IMPULSE_ERROR run_classifier(
 
 /* Deprecated functions ------------------------------------------------------- */
 
-/* These functions are being deprecated and possibly will be removed or moved in future. 
+/* These functions are being deprecated and possibly will be removed or moved in future.
 Do not use these - if possible, change your code to reflect the upcoming changes. */
 
 #if EIDSP_SIGNAL_C_FN_POINTER == 0
@@ -712,7 +758,7 @@ __attribute__((unused)) EI_IMPULSE_ERROR run_impulse(
 #if EI_CLASSIFIER_STUDIO_VERSION < 3
         const ei_impulse_t impulse = ei_construct_impulse();
 #else
-       const ei_impulse_t impulse = ei_default_impulse; 
+       const ei_impulse_t impulse = ei_default_impulse;
 #endif
 
     float *x = (float*)calloc(impulse.dsp_input_frame_size, sizeof(float));

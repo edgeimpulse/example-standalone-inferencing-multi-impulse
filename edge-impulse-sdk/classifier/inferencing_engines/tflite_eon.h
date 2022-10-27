@@ -1,23 +1,18 @@
-/* Edge Impulse inferencing library
+/*
  * Copyright (c) 2022 EdgeImpulse Inc.
  *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
  *
- * The above copyright notice and this permission notice shall be included in
- * all copies or substantial portions of the Software.
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an "AS
+ * IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
+ * express or implied. See the License for the specific language
+ * governing permissions and limitations under the License.
  *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
+ * SPDX-License-Identifier: Apache-2.0
  */
 
 #ifndef _EI_CLASSIFIER_INFERENCING_ENGINE_TFLITE_EON_H_
@@ -70,6 +65,8 @@ static EI_IMPULSE_ERROR inference_tflite_setup(const ei_impulse_t *impulse, uint
     TfLiteTensor** output_labels,
     TfLiteTensor** output_scores,
     ei_unique_ptr_t& p_tensor_arena) {
+    
+    *ctx_start_us = ei_read_timer_us();
 
     TfLiteStatus init_status = trained_model_init(ei_aligned_calloc);
     if (init_status != kTfLiteOk) {
@@ -77,14 +74,12 @@ static EI_IMPULSE_ERROR inference_tflite_setup(const ei_impulse_t *impulse, uint
         return EI_IMPULSE_TFLITE_ARENA_ALLOC_FAILED;
     }
 
-    *ctx_start_us = ei_read_timer_us();
-
     static bool tflite_first_run = true;
 
     *input = impulse->model_input(0);
     *output = impulse->model_output(0);
 
-    if (impulse->object_detection) {
+    if (impulse->object_detection_last_layer == EI_CLASSIFIER_LAST_LAYER_SSD) {
         *output_scores = impulse->model_output(impulse->tflite_output_score_tensor);
         *output_labels = impulse->model_output(impulse->tflite_output_labels_tensor);
     }
@@ -93,7 +88,7 @@ static EI_IMPULSE_ERROR inference_tflite_setup(const ei_impulse_t *impulse, uint
     if (tflite_first_run) {
         assert((*input)->type == impulse->tflite_input_datatype);
         assert((*output)->type == impulse->tflite_output_datatype);
-        if (impulse->object_detection) {
+        if (impulse->object_detection_last_layer == EI_CLASSIFIER_LAST_LAYER_SSD) {
             assert((*output_scores)->type == impulse->tflite_output_datatype);
             assert((*output_labels)->type == impulse->tflite_output_datatype);
         }
@@ -145,23 +140,40 @@ static EI_IMPULSE_ERROR inference_tflite_run(const ei_impulse_t *impulse,
         ei_printf("Predictions (time: %d ms.):\n", result->timing.classification);
     }
 
-    if (impulse->object_detection == EI_OBJECT_DETECTION_FOMO) {
-        bool int8_output = output->type == TfLiteType::kTfLiteInt8;
-        if (int8_output) {
-            fill_result_struct_i8_fomo(impulse, result, output->data.int8, output->params.zero_point, output->params.scale,
-                (int)output->dims->data[1], (int)output->dims->data[2]);
+    if (impulse->object_detection) {
+        switch (impulse->object_detection_last_layer) {
+            case EI_CLASSIFIER_LAST_LAYER_FOMO: {
+                bool int8_output = output->type == TfLiteType::kTfLiteInt8;
+                if (int8_output) {
+                    fill_result_struct_i8_fomo(impulse, result, output->data.int8, output->params.zero_point, output->params.scale,
+                        (int)output->dims->data[1], (int)output->dims->data[2]);
+                }
+                else {
+                    fill_result_struct_f32_fomo(impulse, result, output->data.f, (int)output->dims->data[1], (int)output->dims->data[2]);
+                }
+                break;
+            }
+            case EI_CLASSIFIER_LAST_LAYER_SSD: {
+                #if EI_CLASSIFIER_ENABLE_DETECTION_POSTPROCESS_OP
+                    fill_result_struct_f32_object_detection(impulse, result, tflite::post_process_boxes, tflite::post_process_scores, tflite::post_process_classes, debug);
+                #else
+                    ei_printf("ERR: Cannot run SSD model, EI_CLASSIFIER_ENABLE_DETECTION_POSTPROCESS_OP is disabled\n");
+                    return EI_IMPULSE_UNSUPPORTED_INFERENCING_ENGINE;
+                #endif
+
+                break;
+            }
+            case EI_CLASSIFIER_LAST_LAYER_YOLOV5: {
+                ei_printf("ERR: YOLOv5 models are not supported using EON Compiler, use full TFLite (%d)\n",
+                    impulse->object_detection_last_layer);
+                return EI_IMPULSE_UNSUPPORTED_INFERENCING_ENGINE;
+            }
+            default: {
+                ei_printf("ERR: Unsupported object detection last layer (%d)\n",
+                    impulse->object_detection_last_layer);
+                return EI_IMPULSE_UNSUPPORTED_INFERENCING_ENGINE;
+            }
         }
-        else {
-            fill_result_struct_f32_fomo(impulse, result, output->data.f, (int)output->dims->data[1], (int)output->dims->data[2]);
-        }
-    }
-    else if (impulse->object_detection == EI_OBJECT_DETECTION_SSD) {
-#if EI_CLASSIFIER_ENABLE_DETECTION_POSTPROCESS_OP
-        fill_result_struct_f32_object_detection(impulse, result, tflite::post_process_boxes, tflite::post_process_scores, tflite::post_process_classes, debug);
-#else
-        ei_printf("WARNING: Object detection post-processing op is not enabled.");
-#endif
-        // fill_result_struct_f32(result, output->data.f, scores_tensor->data.f, labels_tensor->data.f, debug);
     }
     else {
         bool int8_output = output->type == TfLiteType::kTfLiteInt8;
@@ -207,7 +219,7 @@ EI_IMPULSE_ERROR run_nn_inference(
     ei_unique_ptr_t p_tensor_arena(nullptr, ei_aligned_free);
 
     EI_IMPULSE_ERROR init_res = inference_tflite_setup(impulse,
-        &ctx_start_us, 
+        &ctx_start_us,
         &input, &output,
         &output_labels,
         &output_scores,
@@ -219,29 +231,29 @@ EI_IMPULSE_ERROR run_nn_inference(
 
     uint8_t* tensor_arena = static_cast<uint8_t*>(p_tensor_arena.get());
 
-    if (impulse->object_detection) {
-        // Place our calculated x value in the model's input tensor
-        bool uint8_input = input->type == TfLiteType::kTfLiteUInt8;
-        for (size_t ix = 0; ix < fmatrix->rows * fmatrix->cols; ix++) {
-            if (uint8_input) {
+    switch (input->type) {
+        case kTfLiteFloat32: {
+            for (size_t ix = 0; ix < fmatrix->rows * fmatrix->cols; ix++) {
+                input->data.f[ix] = fmatrix->buffer[ix];
+            }
+            break;
+        }
+        case kTfLiteInt8: {
+            for (size_t ix = 0; ix < fmatrix->rows * fmatrix->cols; ix++) {
+                float pixel = (float)fmatrix->buffer[ix];
+                input->data.int8[ix] = static_cast<int8_t>(round(pixel / input->params.scale) + input->params.zero_point);
+            }
+            break;
+        }
+        case kTfLiteUInt8: {
+            for (size_t ix = 0; ix < fmatrix->rows * fmatrix->cols; ix++) {
                 float pixel = (float)fmatrix->buffer[ix];
                 input->data.uint8[ix] = static_cast<uint8_t>((pixel / impulse->tflite_input_scale) + impulse->tflite_input_zeropoint);
             }
-            else {
-                input->data.f[ix] = fmatrix->buffer[ix];
-            }
         }
-    }
-    else {
-        bool int8_input = input->type == TfLiteType::kTfLiteInt8;
-        for (size_t ix = 0; ix < fmatrix->rows * fmatrix->cols; ix++) {
-            // Quantize the input if it is int8
-            if (int8_input) {
-                input->data.int8[ix] = static_cast<int8_t>(round(fmatrix->buffer[ix] / input->params.scale) + input->params.zero_point);
-                // printf("float %ld : %d\r\n", ix, input->data.int8[ix]);
-            } else {
-                input->data.f[ix] = fmatrix->buffer[ix];
-            }
+        default: {
+            ei_printf("ERR: Cannot handle input type (%d)\n", input->type);
+            return EI_IMPULSE_INPUT_TENSOR_WAS_NULL;
         }
     }
 
@@ -324,7 +336,7 @@ EI_IMPULSE_ERROR run_nn_inference_image_quantized(
     ctx_start_us = ei_read_timer_us();
 
     EI_IMPULSE_ERROR run_res = inference_tflite_run(impulse,
-        ctx_start_us, 
+        ctx_start_us,
         output,
         output_labels,
         output_scores,
