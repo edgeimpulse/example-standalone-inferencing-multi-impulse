@@ -19,36 +19,75 @@ static const float features_mic[] = {
 };
 
 int main(int argc, char **argv) {
-    
+
     signal_t signal;            // Wrapper for raw input buffer
     ei_impulse_result_t result; // Used to store inference output
     EI_IMPULSE_ERROR res;       // Return code from inference
 
-    // Assign callback function to fill buffer used for preprocessing/inference
+#if EI_CLASSIFIER_STUDIO_VERSION < 3
+    // old run_classifier call
     signal.total_length = EI_CLASSIFIER_DSP_INPUT_FRAME_SIZE;
     signal.get_data = &get_signal_data_acc;
 
-    // old run_classifier call
+    // Perform DSP pre-processing and inference
     res = run_classifier(&signal, &result, false);
-    printf("run_classifier returned: %d\r\n", res);
-    display_results(&result, &ei_default_impulse);
 
+    // Print return code and how long it took to perform inference
+    ei_printf("run_classifier returned: %d\r\n", res);
+    ei_printf("Timing: DSP %d ms, inference %d ms, anomaly %d ms\r\n",
+            result.timing.dsp,
+            result.timing.classification,
+            result.timing.anomaly);
+
+    // Print the prediction results (object detection)
+#if EI_CLASSIFIER_OBJECT_DETECTION == 1
+    ei_printf("Object detection bounding boxes:\r\n");
+    for (uint32_t i = 0; i < EI_CLASSIFIER_OBJECT_DETECTION_COUNT; i++) {
+        ei_impulse_result_bounding_box_t bb = result.bounding_boxes[i];
+        if (bb.value == 0) {
+            continue;
+        }
+        ei_printf("  %s (%f) [ x: %u, y: %u, width: %u, height: %u ]\r\n",
+                bb.label,
+                bb.value,
+                bb.x,
+                bb.y,
+                bb.width,
+                bb.height);
+    }
+
+    // Print the prediction results (classification)
+#else
+    ei_printf("Predictions:\r\n");
+    for (uint16_t i = 0; i < EI_CLASSIFIER_LABEL_COUNT; i++) {
+        ei_printf("  %s: ", ei_classifier_inferencing_categories[i]);
+        ei_printf("%.5f\r\n", result.classification[i].value);
+    }
+#endif
+
+    // Print anomaly result (if it exists)
+#if EI_CLASSIFIER_HAS_ANOMALY == 1
+    ei_printf("Anomaly prediction: %.3f\r\n", result.anomaly);
+#endif
+
+#else
     // Assign callback function to fill buffer used for preprocessing/inference
-    signal.total_length = impulse_acc.dsp_input_frame_size;
+    signal.total_length = impulse_8_5.dsp_input_frame_size;
     signal.get_data = &get_signal_data_acc;
     // new run_classifier call with impulse accelerometer
-    res = run_classifier(&impulse_acc, &signal, &result, false);
+    res = run_classifier(&impulse_8_5, &signal, &result, false);
     printf("run_classifier with acc impulse returned: %d\r\n", res);
-    display_results(&result, &impulse_acc);
+    display_results(&result, &impulse_8_5);
 
     // Assign callback function to fill buffer used for preprocessing/inference
-    signal.total_length = impulse_mic.dsp_input_frame_size;;
+    signal.total_length = impulse_12_10.dsp_input_frame_size;;
     signal.get_data = &get_signal_data_mic;
     // new run_classifier call with impulse microphone
-    res = run_classifier(&impulse_mic, &signal, &result, false);
+    res = run_classifier(&impulse_12_10, &signal, &result, false);
     printf("run_classifier with mic impulse returned: %d\r\n", res);
-    display_results(&result, &impulse_mic);
-
+    display_results(&result, &impulse_12_10);
+    // correct Predictions: faucet: 0.75781 noise: 0.24219
+#endif
     return 0;
 }
 
@@ -71,9 +110,9 @@ static int get_signal_data_mic(size_t offset, size_t length, float *out_ptr) {
 
 static void display_results(ei_impulse_result_t* result, const ei_impulse_t *impulse)
 {
-    printf("Timing: DSP %d ms, inference %d ms, anomaly %d ms\r\n", 
-            result->timing.dsp, 
-            result->timing.classification, 
+    printf("Timing: DSP %d ms, inference %d ms, anomaly %d ms\r\n",
+            result->timing.dsp,
+            result->timing.classification,
             result->timing.anomaly);
 
     // Print the prediction results (object detection)
@@ -84,12 +123,12 @@ if (impulse->object_detection > 0) {
         if (bb.value == 0) {
             continue;
         }
-        printf("  %s (%f) [ x: %u, y: %u, width: %u, height: %u ]\r\n", 
-                bb.label, 
-                bb.value, 
-                bb.x, 
-                bb.y, 
-                bb.width, 
+        printf("  %s (%f) [ x: %u, y: %u, width: %u, height: %u ]\r\n",
+                bb.label,
+                bb.value,
+                bb.x,
+                bb.y,
+                bb.width,
                 bb.height);
     }
     }

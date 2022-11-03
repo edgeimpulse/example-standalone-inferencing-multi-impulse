@@ -1,4 +1,4 @@
-/*
+/* Edge Impulse ingestion SDK
  * Copyright (c) 2022 EdgeImpulse Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -6,13 +6,12 @@
  * You may obtain a copy of the License at
  * http://www.apache.org/licenses/LICENSE-2.0
  *
- * Unless required by applicable law or agreed to in writing,
- * software distributed under the License is distributed on an "AS
- * IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
- * express or implied. See the License for the specific language
- * governing permissions and limitations under the License.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
- * SPDX-License-Identifier: Apache-2.0
  */
 
 #ifndef _EI_CLASSIFIER_INFERENCING_ENGINE_TFLITE_EON_H_
@@ -27,7 +26,7 @@
 
 #include "edge-impulse-sdk/tensorflow/lite/c/common.h"
 #include "edge-impulse-sdk/tensorflow/lite/kernels/internal/tensor_ctypes.h"
-#include "tflite-model/trained_model_compiled.h"
+//#include "tflite-model/trained_model_compiled.h"
 #include "edge-impulse-sdk/classifier/ei_aligned_malloc.h"
 #include "edge-impulse-sdk/classifier/ei_fill_result_struct.h"
 #include "edge-impulse-sdk/classifier/ei_model_types.h"
@@ -65,10 +64,10 @@ static EI_IMPULSE_ERROR inference_tflite_setup(const ei_impulse_t *impulse, uint
     TfLiteTensor** output_labels,
     TfLiteTensor** output_scores,
     ei_unique_ptr_t& p_tensor_arena) {
-    
+
     *ctx_start_us = ei_read_timer_us();
 
-    TfLiteStatus init_status = trained_model_init(ei_aligned_calloc);
+    TfLiteStatus init_status = impulse->model_init(ei_aligned_calloc);
     if (init_status != kTfLiteOk) {
         ei_printf("Failed to allocate TFLite arena (error code %d)\n", init_status);
         return EI_IMPULSE_TFLITE_ARENA_ALLOC_FAILED;
@@ -126,7 +125,7 @@ static EI_IMPULSE_ERROR inference_tflite_run(const ei_impulse_t *impulse,
     ei_impulse_result_t *result,
     bool debug) {
 
-    if(trained_model_invoke() != kTfLiteOk) {
+    if(impulse->model_invoke() != kTfLiteOk) {
         return EI_IMPULSE_TFLITE_ERROR;
     }
 
@@ -185,7 +184,7 @@ static EI_IMPULSE_ERROR inference_tflite_run(const ei_impulse_t *impulse,
         }
     }
 
-    trained_model_reset(ei_aligned_free);
+    impulse->model_reset(ei_aligned_free);
 
     if (ei_run_impulse_check_canceled() == EI_IMPULSE_CANCELED) {
         return EI_IMPULSE_CANCELED;
@@ -311,7 +310,7 @@ EI_IMPULSE_ERROR run_nn_inference_image_quantized(
     ei::matrix_i8_t features_matrix(1, impulse->nn_input_frame_size, input->data.int8);
 
     // run DSP process and quantize automatically
-    int ret = extract_image_features_quantized(impulse, signal, &features_matrix, ei_dsp_blocks[0].config, impulse->frequency);
+    int ret = extract_image_features_quantized(impulse, signal, &features_matrix, impulse->dsp_blocks[0].config, impulse->frequency);
     if (ret != EIDSP_OK) {
         ei_printf("ERR: Failed to run DSP process (%d)\n", ret);
         return EI_IMPULSE_DSP_ERROR;

@@ -1,18 +1,23 @@
-/*
+/* Edge Impulse inferencing library
  * Copyright (c) 2022 EdgeImpulse Inc.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * http://www.apache.org/licenses/LICENSE-2.0
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
  *
- * Unless required by applicable law or agreed to in writing,
- * software distributed under the License is distributed on an "AS
- * IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
- * express or implied. See the License for the specific language
- * governing permissions and limitations under the License.
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
  *
- * SPDX-License-Identifier: Apache-2.0
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
  */
 
 #ifndef _EDGE_IMPULSE_RUN_CLASSIFIER_H_
@@ -41,7 +46,9 @@
 #endif
 
 #if EI_CLASSIFIER_HAS_ANOMALY == 1
+#if EI_CLASSIFIER_STUDIO_VERSION < 3
 #include "model-parameters/anomaly_clusters.h"
+#endif
 #include "inferencing_engines/anomaly.h"
 #endif
 
@@ -50,7 +57,6 @@
 #endif
 
 #if (EI_CLASSIFIER_INFERENCING_ENGINE == EI_CLASSIFIER_TFLITE) && (EI_CLASSIFIER_COMPILED != 1)
-#include "tflite-model/tflite-trained.h"
 #include "edge-impulse-sdk/classifier/inferencing_engines/tflite_micro.h"
 #elif EI_CLASSIFIER_COMPILED == 1
 #include "edge-impulse-sdk/classifier/inferencing_engines/tflite_eon.h"
@@ -360,7 +366,7 @@ extern "C" EI_IMPULSE_ERROR process_impulse_continuous(const ei_impulse_t *impul
 #if EI_CLASSIFIER_CALIBRATION_ENABLED
         if (impulse->sensor == EI_CLASSIFIER_SENSOR_MICROPHONE) {
             if((void *)avg_scores != NULL && enable_maf == true) {
-                if (enable_maf && !ei_calibration.is_configured) {
+                if (enable_maf && !impulse->calibration.is_configured) {
                     // perfcal is not configured, print msg first time
                     static bool has_printed_msg = false;
 
@@ -612,7 +618,7 @@ extern "C" void run_classifier_init()
        const ei_impulse_t impulse = ei_default_impulse;
 #endif
 
-    const ei_model_performance_calibration_t *calibration = &ei_calibration;
+    const ei_model_performance_calibration_t *calibration = &impulse.calibration;
 
     if(calibration != NULL) {
         avg_scores = new RecognizeEvents(calibration,
@@ -630,7 +636,7 @@ __attribute__((unused)) void run_classifier_init(const ei_impulse_t *impulse)
     ei_dsp_clear_continuous_audio_state();
 
 #if EI_CLASSIFIER_CALIBRATION_ENABLED
-    const ei_model_performance_calibration_t *calibration = &ei_calibration;
+    const ei_model_performance_calibration_t *calibration = &impulse->calibration;
 
     if(calibration != NULL) {
         avg_scores = new RecognizeEvents(calibration,

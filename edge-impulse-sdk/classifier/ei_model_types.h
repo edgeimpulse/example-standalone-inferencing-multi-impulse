@@ -1,18 +1,23 @@
-/*
- * Copyright (c) 2022 EdgeImpulse Inc.
+/* Edge Impulse inferencing library
+ * Copyright (c) 2021 EdgeImpulse Inc.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * http://www.apache.org/licenses/LICENSE-2.0
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
  *
- * Unless required by applicable law or agreed to in writing,
- * software distributed under the License is distributed on an "AS
- * IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
- * express or implied. See the License for the specific language
- * governing permissions and limitations under the License.
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
  *
- * SPDX-License-Identifier: Apache-2.0
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
  */
 
 #ifndef _EDGE_IMPULSE_MODEL_TYPES_H_
@@ -68,29 +73,42 @@ typedef struct {
     size_t axes_size;
 } ei_model_dsp_t;
 
+typedef struct {
+    float *centroid;
+    float max_error;
+} ei_classifier_anom_cluster_t;
+
 typedef struct ei_impulse {
+    /* project details */
     uint32_t project_id;
     const char *project_owner;
     const char *project_name;
-
     uint32_t deploy_version;
+
+    /* DSP details */
     uint32_t nn_input_frame_size;
     uint32_t raw_sample_count;
     uint32_t raw_samples_per_frame;
     uint32_t dsp_input_frame_size;
-
     uint32_t input_width;
     uint32_t input_height;
     uint32_t input_frames;
-
     float interval_ms;
-    uint16_t label_count;
-    bool has_anomaly;
     float frequency;
     bool use_quantized_dsp_block;
     size_t dsp_blocks_size;
     ei_model_dsp_t *dsp_blocks;
 
+    /* anomaly details */
+    bool has_anomaly;
+    const uint16_t *anom_axis;
+    uint16_t anom_axes_size;
+    const ei_classifier_anom_cluster_t *anom_clusters;
+    uint16_t anom_cluster_count;
+    const float *anom_scale;
+    const float *anom_mean;
+
+    /* object detection */
     bool object_detection;
     uint16_t object_detection_count;
     float object_detection_threshold;
@@ -100,9 +118,8 @@ typedef struct ei_impulse {
     uint8_t tflite_output_data_tensor;
     uint32_t tflite_output_features_count;
 
+    /* tflite model specific */
     uint32_t tflite_arena_size;
-    const uint8_t *model_arr;
-    size_t model_arr_size;
     uint8_t tflite_input_datatype;
     bool tflite_input_quantized;
     float tflite_input_scale;
@@ -115,16 +132,24 @@ typedef struct ei_impulse {
     uint32_t inferencing_engine;
     bool compiled;
     bool has_tflite_ops_resolver;
+
     uint32_t sensor;
     const char *fusion_string;
     uint32_t slice_size;
     uint32_t slices_per_model_window;
 
+    /* model data */
+    const uint8_t *model_arr;
+    size_t model_arr_size;
     TfLiteTensor* (*model_input)(int);
     TfLiteTensor* (*model_output)(int);
     TfLiteStatus (*model_init)(void*(*alloc_fnc)(size_t,size_t));
     TfLiteStatus (*model_invoke)();
     TfLiteStatus (*model_reset)(void (*free)(void* ptr));
+
+    /* output details */
+    uint16_t label_count;
+    const ei_model_performance_calibration_t calibration;
     const char **categories;
 } ei_impulse_t;
 
