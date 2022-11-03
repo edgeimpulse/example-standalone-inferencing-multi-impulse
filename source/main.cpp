@@ -24,8 +24,7 @@ int main(int argc, char **argv) {
     ei_impulse_result_t result; // Used to store inference output
     EI_IMPULSE_ERROR res;       // Return code from inference
 
-#if EI_CLASSIFIER_STUDIO_VERSION < 3
-    // old run_classifier call
+    // old run_classifier call with default impulse
     signal.total_length = EI_CLASSIFIER_DSP_INPUT_FRAME_SIZE;
     signal.get_data = &get_signal_data_acc;
 
@@ -69,25 +68,24 @@ int main(int argc, char **argv) {
 #if EI_CLASSIFIER_HAS_ANOMALY == 1
     ei_printf("Anomaly prediction: %.3f\r\n", result.anomaly);
 #endif
+    // correct Predictions: idle: 0.00000 snake: 0.00000 updown: 0.99609 wave: 0.00000 Anomaly prediction: -0.358
 
-#else
-    // Assign callback function to fill buffer used for preprocessing/inference
+    // new run_classifier call with impulse accelerometer
     signal.total_length = impulse_8_5.dsp_input_frame_size;
     signal.get_data = &get_signal_data_acc;
-    // new run_classifier call with impulse accelerometer
     res = run_classifier(&impulse_8_5, &signal, &result, false);
     printf("run_classifier with acc impulse returned: %d\r\n", res);
     display_results(&result, &impulse_8_5);
+    // correct Predictions: idle: 0.00000 snake: 0.00000 updown: 0.99609 wave: 0.00000 Anomaly prediction: -0.358
 
-    // Assign callback function to fill buffer used for preprocessing/inference
+    // new run_classifier call with impulse microphone
     signal.total_length = impulse_12_10.dsp_input_frame_size;;
     signal.get_data = &get_signal_data_mic;
-    // new run_classifier call with impulse microphone
     res = run_classifier(&impulse_12_10, &signal, &result, false);
     printf("run_classifier with mic impulse returned: %d\r\n", res);
     display_results(&result, &impulse_12_10);
     // correct Predictions: faucet: 0.75781 noise: 0.24219
-#endif
+
     return 0;
 }
 

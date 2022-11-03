@@ -30,6 +30,6 @@
 #include "impulse_12_10.h"
 
 const ei_impulse_t ei_default_impulse = impulse_8_5;
-const char*  ei_classifier_inferencing_categories = *ei_default_impulse.categories;
+const char** ei_classifier_inferencing_categories = ei_default_impulse.categories;
 
 #endif // _EI_CLASSIFIER_MODEL_METADATA_H_
