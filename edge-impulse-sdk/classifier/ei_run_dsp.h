@@ -61,7 +61,7 @@ __attribute__((unused)) int extract_spectral_analysis_features(
 
     // input matrix from the raw signal
     matrix_t input_matrix(signal->total_length / config->axes, config->axes);
-    if (!input_matrix.buffer) {  
+    if (!input_matrix.buffer) {
         EIDSP_ERR(EIDSP_OUT_OF_MEM);
     }
 
@@ -363,7 +363,7 @@ __attribute__((unused)) int extract_mfcc_per_slice_features(signal_t *signal, ma
 
     if (frame_overlap_values < 0) {
         ei_printf("ERR: frame_length (");
-        ei_printf_float(config.frame_length);            
+        ei_printf_float(config.frame_length);
         ei_printf(") cannot be lower than frame_stride (");
         ei_printf_float(config.frame_stride);
         ei_printf(") for continuous classification\n");
@@ -642,7 +642,7 @@ __attribute__((unused)) int extract_spectrogram_per_slice_features(signal_t *sig
 
     if (frame_overlap_values < 0) {
         ei_printf("ERR: frame_length (");
-        ei_printf_float(config.frame_length);            
+        ei_printf_float(config.frame_length);
         ei_printf(") cannot be lower than frame_stride (");
         ei_printf_float(config.frame_stride);
         ei_printf(") for continuous classification\n");
@@ -968,7 +968,7 @@ __attribute__((unused)) int extract_mfe_per_slice_features(signal_t *signal, mat
 
     if (frame_overlap_values < 0) {
         ei_printf("ERR: frame_length (");
-            ei_printf_float(config.frame_length);            
+            ei_printf_float(config.frame_length);
             ei_printf(") cannot be lower than frame_stride (");
             ei_printf_float(config.frame_stride);
             ei_printf(") for continuous classification\n");
@@ -1244,7 +1244,7 @@ __attribute__((unused)) int extract_drpai_features_quantized(signal_t *signal, m
 
 __attribute__((unused)) int extract_image_features_quantized(const ei_impulse_t *impulse, signal_t *signal, matrix_i8_t *output_matrix, void *config_ptr, const float frequency) {
     ei_dsp_config_image_t config = *((ei_dsp_config_image_t*)config_ptr);
-
+/*
     int16_t channel_count = strcmp(config.channels, "Grayscale") == 0 ? 1 : 3;
 
     size_t output_ix = 0;
@@ -1331,7 +1331,7 @@ __attribute__((unused)) int extract_image_features_quantized(const ei_impulse_t 
 
         bytes_left -= elements_to_read;
     }
-
+*/
     return EIDSP_OK;
 }
 #endif // (EI_CLASSIFIER_TFLITE_INPUT_QUANTIZED == 1) && (EI_CLASSIFIER_INFERENCING_ENGINE != EI_CLASSIFIER_DRPAI)

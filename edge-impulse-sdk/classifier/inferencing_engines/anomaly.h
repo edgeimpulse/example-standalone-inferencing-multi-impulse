@@ -91,21 +91,25 @@ float get_min_distance_to_cluster(float *input, size_t input_size, const ei_clas
 }
 #endif // __cplusplus
 
-EI_IMPULSE_ERROR inference_anomaly_invoke(const ei_impulse_t *impulse,
-                                          ei::matrix_t *fmatrix,
-                                          ei_impulse_result_t *result,
-                                          bool debug = false)
+EI_IMPULSE_ERROR run_kmeans_anomaly(
+    const ei_impulse_t *impulse,
+    ei::matrix_t *fmatrix,
+    ei_impulse_result_t *result,
+    void *config_ptr,
+    bool debug = false)
 {
+
+    ei_learning_block_config_anomaly_kmeans_t config = *((ei_learning_block_config_anomaly_kmeans_t*)config_ptr);
 
     uint64_t anomaly_start_ms = ei_read_timer_ms();
 
-    float input[impulse->anom_axes_size];
-    for (size_t ix = 0; ix < impulse->anom_axes_size; ix++) {
-        input[ix] = fmatrix->buffer[impulse->anom_axis[ix]];
+    float input[config.anom_axes_size];
+    for (size_t ix = 0; ix < config.anom_axes_size; ix++) {
+        input[ix] = fmatrix->buffer[config.anom_axis[ix]];
     }
-    standard_scaler(input, impulse->anom_scale, impulse->anom_mean, impulse->anom_axes_size);
+    standard_scaler(input, config.anom_scale, config.anom_mean, config.anom_axes_size);
     float anomaly = get_min_distance_to_cluster(
-        input, impulse->anom_axes_size, impulse->anom_clusters, impulse->anom_cluster_count);
+        input, config.anom_axes_size, config.anom_clusters, config.anom_cluster_count);
 
     uint64_t anomaly_end_ms = ei_read_timer_ms();
 

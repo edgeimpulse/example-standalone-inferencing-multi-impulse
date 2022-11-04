@@ -41,10 +41,6 @@
 #include "model-parameters/dsp_blocks.h"
 #endif
 
-#if EI_CLASSIFIER_HAS_MODEL_VARIABLES == 1
-#include "model-parameters/model_variables.h"
-#endif
-
 #if EI_CLASSIFIER_HAS_ANOMALY == 1
 #if EI_CLASSIFIER_STUDIO_VERSION < 3
 #include "model-parameters/anomaly_clusters.h"
@@ -75,6 +71,8 @@
 #else
 #error "Unknown inferencing engine"
 #endif
+
+#include "model-parameters/model_variables.h"
 
 #if ECM3532
 void*   __dso_handle = (void*) &__dso_handle;
@@ -126,21 +124,14 @@ extern "C" EI_IMPULSE_ERROR run_inference(
     ei_impulse_result_t *result,
     bool debug = false)
 {
-#if (EI_CLASSIFIER_INFERENCING_ENGINE != EI_CLASSIFIER_NONE && EI_CLASSIFIER_INFERENCING_ENGINE != EI_CLASSIFIER_DRPAI)
-    EI_IMPULSE_ERROR nn_res = run_nn_inference(impulse, fmatrix, result, debug);
-    if (nn_res != EI_IMPULSE_OK) {
-        return nn_res;
-    }
-#endif
+    for (size_t ix = 0; ix < impulse->learning_blocks_size; ix++) {
+        ei_learning_block_t block = impulse->learning_blocks[ix];
 
-#if EI_CLASSIFIER_HAS_ANOMALY == 1
-    if (impulse->has_anomaly) {
-        EI_IMPULSE_ERROR anomaly_res = inference_anomaly_invoke(impulse, fmatrix, result, debug);
-        if (anomaly_res != EI_IMPULSE_OK) {
-            return anomaly_res;
+        EI_IMPULSE_ERROR res = block.infer_fn(impulse, fmatrix, result, block.config, debug);
+        if (res != EI_IMPULSE_OK) {
+            return res;
         }
     }
-#endif
 
     if (ei_run_impulse_check_canceled() == EI_IMPULSE_CANCELED) {
         return EI_IMPULSE_CANCELED;
@@ -552,7 +543,7 @@ __attribute__((unused)) static EI_IMPULSE_ERROR can_run_classifier_image_quantiz
     {
         return EI_IMPULSE_UNSUPPORTED_INFERENCING_ENGINE;
     }
-
+/*
     if (impulse->has_anomaly == 1){
         return EI_IMPULSE_ONLY_SUPPORTED_FOR_IMAGES;
     }
@@ -566,7 +557,7 @@ __attribute__((unused)) static EI_IMPULSE_ERROR can_run_classifier_image_quantiz
     if (impulse->dsp_blocks_size != 1 || impulse->dsp_blocks[0].extract_fn != extract_image_features) {
         return EI_IMPULSE_ONLY_SUPPORTED_FOR_IMAGES;
     }
-
+*/
     return EI_IMPULSE_OK;
 }
 

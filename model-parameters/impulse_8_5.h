@@ -26,69 +26,16 @@
 #include "tflite-model/tflite-trained_8_5.h"
 #include "edge-impulse-sdk/classifier/ei_model_types.h"
 
+EI_IMPULSE_ERROR run_nn_inference(
+    const ei_impulse_t *impulse,
+    ei::matrix_t *fmatrix,
+    ei_impulse_result_t *result,
+    void *config_ptr,
+    bool debug);
+
 namespace namespace_8_5 {
 
     const char* ei_classifier_inferencing_categories[] = { "idle", "snake", "updown", "wave" };
-
-    uint8_t ei_dsp_config_3_axes[] = { 0, 1, 2 };
-    const uint32_t ei_dsp_config_3_axes_size = 3;
-    ei_dsp_config_spectral_analysis_t ei_dsp_config_3 = {
-        2,
-        3,
-        1.0f,
-        "none",
-        3.0f,
-        6,
-        16,
-        3,
-        0.1f,
-        "0.1, 0.5, 1.0, 2.0, 5.0",
-        true,
-        true
-    };
-
-    uint8_t ei_dsp_config_7_axes[] = { 0, 1, 2 };
-    const uint32_t ei_dsp_config_7_axes_size = 3;
-    ei_dsp_config_flatten_t ei_dsp_config_7 = {
-        1,
-        3,
-        1.0f,
-        true,
-        true,
-        true,
-        true,
-        true,
-        true,
-        true
-    };
-
-
-    const size_t ei_dsp_blocks_size = 2;
-    ei_model_dsp_t ei_dsp_blocks[ei_dsp_blocks_size] = {
-        { // DSP block 3
-            33,
-            &extract_spectral_analysis_features,
-            (void*)&ei_dsp_config_3,
-            ei_dsp_config_3_axes,
-            ei_dsp_config_3_axes_size
-        },
-        { // DSP block 7
-            21,
-            &extract_flatten_features,
-            (void*)&ei_dsp_config_7,
-            ei_dsp_config_7_axes,
-            ei_dsp_config_7_axes_size
-        }
-    };
-
-    const ei_model_performance_calibration_t ei_calibration = {
-        1, /* integer version number */
-        false, /* has configured performance calibration */
-        (int32_t)(125 / 62.5) * 1000, /* Model window */
-        0.8f, /* Default threshold */
-        (int32_t)(125 / 62.5) * 500, /* Half of model window */
-        0   /* Don't use flags */
-    };
 
     const uint16_t ei_classifier_anom_axes[]  { 11, 13, 22 };
         // (before - mean) / scale
@@ -135,6 +82,116 @@ namespace namespace_8_5 {
     , { ( float[] ) { -0.9197426438331604, 18.87964630126953, -1.0759057998657227 }, 0 }
     };
 
+    uint8_t ei_dsp_config_3_axes[] = { 0, 1, 2 };
+    const uint32_t ei_dsp_config_3_axes_size = 3;
+    ei_dsp_config_spectral_analysis_t ei_dsp_config_3 = {
+        2,
+        3,
+        1.0f,
+        "none",
+        3.0f,
+        6,
+        16,
+        3,
+        0.1f,
+        "0.1, 0.5, 1.0, 2.0, 5.0",
+        true,
+        true
+    };
+
+    uint8_t ei_dsp_config_7_axes[] = { 0, 1, 2 };
+    const uint32_t ei_dsp_config_7_axes_size = 3;
+    ei_dsp_config_flatten_t ei_dsp_config_7 = {
+        1,
+        3,
+        1.0f,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true
+    };
+
+    const size_t ei_dsp_blocks_size = 2;
+    ei_model_dsp_t ei_dsp_blocks[ei_dsp_blocks_size] = {
+        { // DSP block 3
+            33,
+            &extract_spectral_analysis_features,
+            (void*)&ei_dsp_config_3,
+            ei_dsp_config_3_axes,
+            ei_dsp_config_3_axes_size
+        },
+        { // DSP block 7
+            21,
+            &extract_flatten_features,
+            (void*)&ei_dsp_config_7,
+            ei_dsp_config_7_axes,
+            ei_dsp_config_7_axes_size
+        }
+    };
+
+    uint8_t ei_learning_block_config_3_axes[] = { 0, 1, 2 };
+    const uint32_t ei_learning_block_config_3_axes_size = 3;
+    ei_learning_block_config_tflite_graph_t ei_learning_block_config_3 = {
+        .implementation_version = 2,
+        .axes = 3,
+        .tflite_arena_size = 2598,
+        .tflite_input_datatype = EI_CLASSIFIER_DATATYPE_INT8,
+        .tflite_input_quantized = 1,
+        .tflite_input_scale = 0.5589553713798523,
+        .tflite_input_zeropoint = -63,
+        .tflite_output_datatype = EI_CLASSIFIER_DATATYPE_INT8,
+        .tflite_output_quantized = 1,
+        .tflite_output_scale = 0.00390625,
+        .tflite_output_zeropoint = -128,
+
+        .model_arr = namespace_8_5::trained_tflite,
+        .model_arr_size = namespace_8_5::trained_tflite_len,
+        .model_input = NULL,
+        .model_output = NULL,
+        .model_init = NULL,
+        .model_invoke = NULL,
+        .model_reset = NULL,
+
+    };
+
+    uint8_t ei_learning_block_config_7_axes[] = { 0, 1, 2 };
+    const uint32_t ei_learning_block_config_7_axes_size = 3;
+    ei_learning_block_config_anomaly_kmeans_t ei_learning_block_config_7 = {
+        .implementation_version = 1,
+        .anom_axis = namespace_8_5::ei_classifier_anom_axes,
+        .anom_axes_size = 3,
+        .anom_clusters = namespace_8_5::ei_classifier_anom_clusters,
+        .anom_cluster_count = 37,
+        .anom_scale = namespace_8_5::ei_classifier_anom_scale,
+        .anom_mean = namespace_8_5::ei_classifier_anom_mean,
+    };
+
+    const size_t ei_learning_blocks_size = 2;
+    ei_learning_block_t ei_learning_blocks[ei_learning_blocks_size] = {
+        {   &run_nn_inference,
+            (void*)&ei_learning_block_config_3,
+            ei_dsp_config_3_axes,
+            ei_dsp_config_3_axes_size
+        },
+        {   &run_kmeans_anomaly,
+            (void*)&ei_learning_block_config_7,
+            ei_dsp_config_7_axes,
+            ei_dsp_config_7_axes_size
+        }
+    };
+
+    const ei_model_performance_calibration_t ei_calibration = {
+        1, /* integer version number */
+        false, /* has configured performance calibration */
+        (int32_t)(125 / 62.5) * 1000, /* Model window */
+        0.8f, /* Default threshold */
+        (int32_t)(125 / 62.5) * 500, /* Half of model window */
+        0   /* Don't use flags */
+    };
+
 } // namespace_8_5 namespace
 
 const ei_impulse_t impulse_8_5 = {
@@ -152,17 +209,8 @@ const ei_impulse_t impulse_8_5 = {
     .input_frames = 0,
     .interval_ms = 16,
     .frequency = 62.5,
-    .use_quantized_dsp_block = 0,
     .dsp_blocks_size = namespace_8_5::ei_dsp_blocks_size,
     .dsp_blocks = namespace_8_5::ei_dsp_blocks,
-
-    .has_anomaly = 1,
-    .anom_axis = namespace_8_5::ei_classifier_anom_axes,
-    .anom_axes_size = 3,
-    .anom_clusters = namespace_8_5::ei_classifier_anom_clusters,
-    .anom_cluster_count = 37,
-    .anom_scale = namespace_8_5::ei_classifier_anom_scale,
-    .anom_mean = namespace_8_5::ei_classifier_anom_mean,
 
     .object_detection = 0,
     .object_detection_count = 0,
@@ -172,15 +220,8 @@ const ei_impulse_t impulse_8_5 = {
     .tflite_output_score_tensor = 0,
     .tflite_output_data_tensor = 0,
 
-    .tflite_arena_size = 2598,
-    .tflite_input_datatype = EI_CLASSIFIER_DATATYPE_INT8,
-    .tflite_input_quantized = 1,
-    .tflite_input_scale = 0.5589553713798523,
-    .tflite_input_zeropoint = -63,
-    .tflite_output_datatype = EI_CLASSIFIER_DATATYPE_INT8,
-    .tflite_output_quantized = 1,
-    .tflite_output_scale = 0.00390625,
-    .tflite_output_zeropoint = -128,
+    .learning_blocks_size =  namespace_8_5::ei_learning_blocks_size,
+    .learning_blocks = namespace_8_5::ei_learning_blocks,
 
     .inferencing_engine = EI_CLASSIFIER_TFLITE,
     .compiled = 0,
@@ -191,14 +232,6 @@ const ei_impulse_t impulse_8_5 = {
 
     .slice_size = (125/4),
     .slices_per_model_window = 4,
-
-    .model_arr = namespace_8_5::trained_tflite,
-    .model_arr_size = namespace_8_5::trained_tflite_len,
-    .model_input = NULL,
-    .model_output = NULL,
-    .model_init = NULL,
-    .model_invoke = NULL,
-    .model_reset = NULL,
 
     .label_count = 4,
     .calibration = namespace_8_5::ei_calibration,

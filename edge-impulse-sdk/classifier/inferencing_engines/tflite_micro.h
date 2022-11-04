@@ -20,9 +20,6 @@
 #if (EI_CLASSIFIER_INFERENCING_ENGINE == EI_CLASSIFIER_TFLITE) && (EI_CLASSIFIER_COMPILED != 1)
 
 #include "model-parameters/model_metadata.h"
-#if EI_CLASSIFIER_HAS_MODEL_VARIABLES == 1
-#include "model-parameters/model_variables.h"
-#endif
 
 #include <cmath>
 #include "edge-impulse-sdk/tensorflow/lite/micro/all_ops_resolver.h"
@@ -80,7 +77,11 @@ static TfLiteRegistration post_process_op = tflite::ops::micro::Register_TFLite_
  *
  * @return  EI_IMPULSE_OK if successful
  */
-static EI_IMPULSE_ERROR inference_tflite_setup(const ei_impulse_t *impulse, uint64_t *ctx_start_us, TfLiteTensor** input, TfLiteTensor** output,
+static EI_IMPULSE_ERROR inference_tflite_setup(const ei_impulse_t *impulse,
+    ei_learning_block_config_tflite_graph_t config,
+    uint64_t *ctx_start_us,
+    TfLiteTensor** input,
+    TfLiteTensor** output,
     TfLiteTensor** output_labels,
     TfLiteTensor** output_scores,
     tflite::MicroInterpreter** micro_interpreter,
@@ -94,20 +95,20 @@ static EI_IMPULSE_ERROR inference_tflite_setup(const ei_impulse_t *impulse, uint
     p_tensor_arena = ei_unique_ptr_t(tensor_arena, [](void*){});
 #else
     // Create an area of memory to use for input, output, and intermediate arrays.
-    uint8_t *tensor_arena = (uint8_t*)ei_aligned_calloc(16, impulse->tflite_arena_size);
+    uint8_t *tensor_arena = (uint8_t*)ei_aligned_calloc(16, config.tflite_arena_size);
     if (tensor_arena == NULL) {
-        ei_printf("Failed to allocate TFLite arena (%d bytes)\n", impulse->tflite_arena_size);
+        ei_printf("Failed to allocate TFLite arena (%d bytes)\n", config.tflite_arena_size);
         return EI_IMPULSE_TFLITE_ARENA_ALLOC_FAILED;
     }
     p_tensor_arena = ei_unique_ptr_t(tensor_arena, ei_aligned_free);
 #endif
 
     static bool tflite_first_run = true;
-    static uint32_t project_id = 0;
+    static uint8_t *model_arr = NULL;
 
-    if (project_id != impulse->project_id) {
+    if (model_arr != config.model_arr) {
         tflite_first_run = true;
-        project_id = impulse->project_id;
+        model_arr = (uint8_t*)config.model_arr;
     }
 
     static const tflite::Model* model = nullptr;
@@ -120,7 +121,7 @@ static EI_IMPULSE_ERROR inference_tflite_setup(const ei_impulse_t *impulse, uint
     if (tflite_first_run) {
         // Map the model into a usable data structure. This doesn't involve any
         // copying or parsing, it's a very lightweight operation.
-        model = tflite::GetModel(impulse->model_arr);
+        model = tflite::GetModel(config.model_arr);
         if (model->version() != TFLITE_SCHEMA_VERSION) {
             error_reporter->Report(
                 "Model provided is schema version %d not equal "
@@ -141,7 +142,7 @@ static EI_IMPULSE_ERROR inference_tflite_setup(const ei_impulse_t *impulse, uint
 
     // Build an interpreter to run the model with.
     tflite::MicroInterpreter *interpreter = new tflite::MicroInterpreter(
-        model, resolver, tensor_arena, impulse->tflite_arena_size, error_reporter);
+        model, resolver, tensor_arena, config.tflite_arena_size, error_reporter);
 
     *micro_interpreter = interpreter;
 
@@ -162,19 +163,19 @@ static EI_IMPULSE_ERROR inference_tflite_setup(const ei_impulse_t *impulse, uint
     }
 
     if (tflite_first_run) {
-        assert((*input)->type == impulse->tflite_input_datatype);
-        assert((*output)->type == impulse->tflite_output_datatype);
+        assert((*input)->type == config.tflite_input_datatype);
+        assert((*output)->type == config.tflite_output_datatype);
         if (impulse->object_detection_last_layer == EI_CLASSIFIER_LAST_LAYER_SSD) {
-            assert((*output_scores)->type == impulse->tflite_output_datatype);
-            assert((*output_labels)->type == impulse->tflite_output_datatype);
+            assert((*output_scores)->type == config.tflite_output_datatype);
+            assert((*output_labels)->type == config.tflite_output_datatype);
         }
-        if (impulse->tflite_input_quantized) {
-            assert((*input)->params.scale == impulse->tflite_input_scale);
-            assert((*input)->params.zero_point == impulse->tflite_input_zeropoint);
+        if (config.tflite_input_quantized) {
+            assert((*input)->params.scale == config.tflite_input_scale);
+            assert((*input)->params.zero_point == config.tflite_input_zeropoint);
         }
-        if (impulse->tflite_output_quantized) {
-            assert((*output)->params.scale == impulse->tflite_output_scale);
-            assert((*output)->params.zero_point == impulse->tflite_output_zeropoint);
+        if (config.tflite_output_quantized) {
+            assert((*output)->params.scale == config.tflite_output_scale);
+            assert((*output)->params.zero_point == config.tflite_output_zeropoint);
         }
 
         tflite_first_run = true;
@@ -195,7 +196,9 @@ static EI_IMPULSE_ERROR inference_tflite_setup(const ei_impulse_t *impulse, uint
  *
  * @return  EI_IMPULSE_OK if successful
  */
-static EI_IMPULSE_ERROR inference_tflite_run(const ei_impulse_t *impulse,
+static EI_IMPULSE_ERROR inference_tflite_run(
+    const ei_impulse_t *impulse,
+    ei_learning_block_config_tflite_graph_t config,
     uint64_t ctx_start_us,
     TfLiteTensor* output,
     TfLiteTensor* labels_tensor,
@@ -288,8 +291,11 @@ EI_IMPULSE_ERROR run_nn_inference(
     const ei_impulse_t *impulse,
     ei::matrix_t *fmatrix,
     ei_impulse_result_t *result,
+    void *config_ptr,
     bool debug = false)
 {
+    ei_learning_block_config_tflite_graph_t config = *((ei_learning_block_config_tflite_graph_t*)config_ptr);
+
     TfLiteTensor* input;
     TfLiteTensor* output;
     TfLiteTensor* output_scores;
@@ -298,7 +304,9 @@ EI_IMPULSE_ERROR run_nn_inference(
     ei_unique_ptr_t p_tensor_arena(nullptr, ei_aligned_free);
 
     tflite::MicroInterpreter* interpreter;
-    EI_IMPULSE_ERROR init_res = inference_tflite_setup(impulse,
+    EI_IMPULSE_ERROR init_res = inference_tflite_setup(
+        impulse,
+        config,
         &ctx_start_us,
         &input, &output,
         &output_labels,
@@ -328,7 +336,7 @@ EI_IMPULSE_ERROR run_nn_inference(
         case kTfLiteUInt8: {
             for (size_t ix = 0; ix < fmatrix->rows * fmatrix->cols; ix++) {
                 float pixel = (float)fmatrix->buffer[ix];
-                input->data.uint8[ix] = static_cast<uint8_t>((pixel / impulse->tflite_input_scale) + impulse->tflite_input_zeropoint);
+                input->data.uint8[ix] = static_cast<uint8_t>((pixel / config.tflite_input_scale) + config.tflite_input_zeropoint);
             }
         }
         default: {
@@ -337,7 +345,9 @@ EI_IMPULSE_ERROR run_nn_inference(
         }
     }
 
-    EI_IMPULSE_ERROR run_res = inference_tflite_run(impulse,
+    EI_IMPULSE_ERROR run_res = inference_tflite_run(
+        impulse,
+        config,
         ctx_start_us,
         output,
         output_labels,
@@ -375,7 +385,9 @@ EI_IMPULSE_ERROR run_nn_inference_image_quantized(
     ei_unique_ptr_t p_tensor_arena(nullptr,ei_aligned_free);
 
     tflite::MicroInterpreter* interpreter;
-    EI_IMPULSE_ERROR init_res = inference_tflite_setup(impulse,
+    /* EI_IMPULSE_ERROR init_res = inference_tflite_setup(
+        impulse,
+        config,
         &ctx_start_us,
         &input, &output,
         &output_labels,
@@ -386,7 +398,7 @@ EI_IMPULSE_ERROR run_nn_inference_image_quantized(
     if (init_res != EI_IMPULSE_OK) {
         return init_res;
     }
-
+*/
     if (input->type != TfLiteType::kTfLiteInt8) {
         return EI_IMPULSE_ONLY_SUPPORTED_FOR_IMAGES;
     }
@@ -409,7 +421,7 @@ EI_IMPULSE_ERROR run_nn_inference_image_quantized(
 
     result->timing.dsp_us = ei_read_timer_us() - dsp_start_us;
     result->timing.dsp = (int)(result->timing.dsp_us / 1000);
-
+/*
     if (debug) {
         ei_printf("Features (%d ms.): ", result->timing.dsp);
         for (size_t ix = 0; ix < features_matrix.cols; ix++) {
@@ -422,6 +434,7 @@ EI_IMPULSE_ERROR run_nn_inference_image_quantized(
     ctx_start_us = ei_read_timer_us();
 
     EI_IMPULSE_ERROR run_res = inference_tflite_run(impulse,
+        config,
         ctx_start_us,
         output,
         output_labels,
@@ -433,7 +446,7 @@ EI_IMPULSE_ERROR run_nn_inference_image_quantized(
     if (run_res != EI_IMPULSE_OK) {
         return run_res;
     }
-
+*/
     result->timing.classification_us = ei_read_timer_us() - ctx_start_us;
 
     return EI_IMPULSE_OK;

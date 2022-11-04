@@ -25,6 +25,7 @@
 
 #include <stdint.h>
 
+#include "edge-impulse-sdk/classifier/ei_classifier_types.h"
 #include "edge-impulse-sdk/dsp/numpy.hpp"
 #include "edge-impulse-sdk/tensorflow/lite/c/common.h"
 
@@ -78,6 +79,47 @@ typedef struct {
     float max_error;
 } ei_classifier_anom_cluster_t;
 
+typedef struct {
+    EI_IMPULSE_ERROR (*infer_fn)(const ei_impulse *impulse, ei::matrix_t *fmatrix, ei_impulse_result_t *result, void *config, bool debug);
+    void *config;
+    uint8_t *axes;
+    size_t axes_size;
+} ei_learning_block_t;
+
+typedef struct {
+    uint16_t implementation_version;
+    int axes;
+
+    uint32_t tflite_arena_size;
+    uint8_t tflite_input_datatype;
+    bool tflite_input_quantized;
+    float tflite_input_scale;
+    float tflite_input_zeropoint;
+    uint8_t tflite_output_datatype;
+    bool tflite_output_quantized;
+    float tflite_output_scale;
+    float tflite_output_zeropoint;
+
+    const uint8_t *model_arr;
+    size_t model_arr_size;
+    TfLiteTensor* (*model_input)(int);
+    TfLiteTensor* (*model_output)(int);
+    TfLiteStatus (*model_init)(void*(*alloc_fnc)(size_t,size_t));
+    TfLiteStatus (*model_invoke)();
+    TfLiteStatus (*model_reset)(void (*free)(void* ptr));
+} ei_learning_block_config_tflite_graph_t;
+
+typedef struct {
+    uint16_t implementation_version;
+
+    const uint16_t *anom_axis;
+    uint16_t anom_axes_size;
+    const ei_classifier_anom_cluster_t *anom_clusters;
+    uint16_t anom_cluster_count;
+    const float *anom_scale;
+    const float *anom_mean;
+} ei_learning_block_config_anomaly_kmeans_t;
+
 typedef struct ei_impulse {
     /* project details */
     uint32_t project_id;
@@ -95,18 +137,8 @@ typedef struct ei_impulse {
     uint32_t input_frames;
     float interval_ms;
     float frequency;
-    bool use_quantized_dsp_block;
     size_t dsp_blocks_size;
     ei_model_dsp_t *dsp_blocks;
-
-    /* anomaly details */
-    bool has_anomaly;
-    const uint16_t *anom_axis;
-    uint16_t anom_axes_size;
-    const ei_classifier_anom_cluster_t *anom_clusters;
-    uint16_t anom_cluster_count;
-    const float *anom_scale;
-    const float *anom_mean;
 
     /* object detection */
     bool object_detection;
@@ -118,16 +150,8 @@ typedef struct ei_impulse {
     uint8_t tflite_output_data_tensor;
     uint32_t tflite_output_features_count;
 
-    /* tflite model specific */
-    uint32_t tflite_arena_size;
-    uint8_t tflite_input_datatype;
-    bool tflite_input_quantized;
-    float tflite_input_scale;
-    float tflite_input_zeropoint;
-    uint8_t tflite_output_datatype;
-    bool tflite_output_quantized;
-    float tflite_output_scale;
-    float tflite_output_zeropoint;
+    size_t learning_blocks_size;
+    ei_learning_block_t *learning_blocks;
 
     uint32_t inferencing_engine;
     bool compiled;
@@ -137,15 +161,6 @@ typedef struct ei_impulse {
     const char *fusion_string;
     uint32_t slice_size;
     uint32_t slices_per_model_window;
-
-    /* model data */
-    const uint8_t *model_arr;
-    size_t model_arr_size;
-    TfLiteTensor* (*model_input)(int);
-    TfLiteTensor* (*model_output)(int);
-    TfLiteStatus (*model_init)(void*(*alloc_fnc)(size_t,size_t));
-    TfLiteStatus (*model_invoke)();
-    TfLiteStatus (*model_reset)(void (*free)(void* ptr));
 
     /* output details */
     uint16_t label_count;
