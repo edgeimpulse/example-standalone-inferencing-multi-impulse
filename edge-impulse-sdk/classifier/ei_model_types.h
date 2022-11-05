@@ -163,6 +163,7 @@ typedef struct ei_impulse {
     uint32_t slices_per_model_window;
 
     /* output details */
+    bool has_anomaly;
     uint16_t label_count;
     const ei_model_performance_calibration_t calibration;
     const char **categories;

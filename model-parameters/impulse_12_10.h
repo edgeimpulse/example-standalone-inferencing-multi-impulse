@@ -131,6 +131,7 @@ const ei_impulse_t impulse_12_10 = {
     .model_invoke = NULL,
     .model_reset = NULL,
 
+    .has_anomaly = 0,
     .label_count = 2,
     .calibration = namespace_12_10::ei_calibration,
     .categories = new const char*[4] { "faucet", "noise" }

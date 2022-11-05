@@ -140,7 +140,7 @@ if (impulse->object_detection > 0) {
     }
 
     // Print anomaly result (if it exists)
-    //if (impulse->has_anomaly == 1) {
-    //    printf("Anomaly prediction: %.3f\r\n", result->anomaly);
-    //}
+    if (impulse->has_anomaly == 1) {
+        printf("Anomaly prediction: %.3f\r\n", result->anomaly);
+    }
 }

@@ -552,12 +552,12 @@ __attribute__((unused)) static EI_IMPULSE_ERROR can_run_classifier_image_quantiz
     if (impulse->tflite_input_quantized != 1) {
         return EI_IMPULSE_ONLY_SUPPORTED_FOR_IMAGES;
     }
-
+*/
     // And if we have one DSP block which operates on images...
     if (impulse->dsp_blocks_size != 1 || impulse->dsp_blocks[0].extract_fn != extract_image_features) {
         return EI_IMPULSE_ONLY_SUPPORTED_FOR_IMAGES;
     }
-*/
+
     return EI_IMPULSE_OK;
 }
 

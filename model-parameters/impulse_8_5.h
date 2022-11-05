@@ -232,6 +232,7 @@ const ei_impulse_t impulse_8_5 = {
 
     .slice_size = (125/4),
     .slices_per_model_window = 4,
+    .has_anomaly = 1,
 
     .label_count = 4,
     .calibration = namespace_8_5::ei_calibration,
