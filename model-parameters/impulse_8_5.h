@@ -173,13 +173,13 @@ namespace namespace_8_5 {
     ei_learning_block_t ei_learning_blocks[ei_learning_blocks_size] = {
         {   &run_nn_inference,
             (void*)&ei_learning_block_config_3,
-            ei_dsp_config_3_axes,
-            ei_dsp_config_3_axes_size
+            ei_learning_block_config_3_axes,
+            ei_learning_block_config_3_axes_size
         },
         {   &run_kmeans_anomaly,
             (void*)&ei_learning_block_config_7,
-            ei_dsp_config_7_axes,
-            ei_dsp_config_7_axes_size
+            ei_learning_block_config_7_axes,
+            ei_learning_block_config_7_axes_size
         }
     };
 
