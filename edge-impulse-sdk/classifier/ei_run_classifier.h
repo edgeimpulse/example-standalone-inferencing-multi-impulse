@@ -543,11 +543,11 @@ __attribute__((unused)) static EI_IMPULSE_ERROR can_run_classifier_image_quantiz
     {
         return EI_IMPULSE_UNSUPPORTED_INFERENCING_ENGINE;
     }
-/*
+
     if (impulse->has_anomaly == 1){
         return EI_IMPULSE_ONLY_SUPPORTED_FOR_IMAGES;
     }
-
+/*
         // Check if we have a quantized NN Input layer (input is always quantized for DRP-AI)
     if (impulse->tflite_input_quantized != 1) {
         return EI_IMPULSE_ONLY_SUPPORTED_FOR_IMAGES;

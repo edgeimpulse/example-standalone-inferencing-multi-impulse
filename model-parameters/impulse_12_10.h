@@ -57,6 +57,39 @@ namespace namespace_12_10 {
         }
     };
 
+    uint8_t ei_learning_block_config_3_axes[] = { 0, 1, 2 };
+    const uint32_t ei_learning_block_config_3_axes_size = 3;
+    ei_learning_block_config_tflite_graph_t ei_learning_block_config_3 = {
+        .implementation_version = 2,
+        .axes = 3,
+        .tflite_arena_size = 11468,
+        .tflite_input_datatype = EI_CLASSIFIER_DATATYPE_INT8,
+        .tflite_input_quantized = 1,
+        .tflite_input_scale = 0.038505394011735916,
+        .tflite_input_zeropoint = -19,
+        .tflite_output_datatype = EI_CLASSIFIER_DATATYPE_INT8,
+        .tflite_output_quantized = 1,
+        .tflite_output_scale = 0.00390625,
+        .tflite_output_zeropoint = -128,
+
+        .model_arr = namespace_12_10::trained_tflite,
+        .model_arr_size = namespace_12_10::trained_tflite_len,
+        .model_input = NULL,
+        .model_output = NULL,
+        .model_init = NULL,
+        .model_invoke = NULL,
+        .model_reset = NULL,
+    };
+
+    const size_t ei_learning_blocks_size = 1;
+    ei_learning_block_t ei_learning_blocks[ei_learning_blocks_size] = {
+        {   &run_nn_inference,
+            (void*)&ei_learning_block_config_3,
+            ei_learning_block_config_3_axes,
+            ei_learning_block_config_3_axes_size
+        }
+    };
+
     const ei_model_performance_calibration_t ei_calibration = {
         1, /* integer version number */
         false, /* has configured performance calibration */
@@ -83,17 +116,8 @@ const ei_impulse_t impulse_12_10 = {
     .input_frames = 0,
     .interval_ms = 0.0625,
     .frequency = 16000,
-    .use_quantized_dsp_block = 0,
     .dsp_blocks_size = namespace_12_10::ei_dsp_blocks_size,
     .dsp_blocks = namespace_12_10::ei_dsp_blocks,
-
-    .has_anomaly = 0,
-    .anom_axis = NULL,
-    .anom_axes_size = NULL,
-    .anom_clusters = NULL,
-    .anom_cluster_count = NULL,
-    .anom_scale = NULL,
-    .anom_mean = NULL,
 
     .object_detection = 0,
     .object_detection_count = 0,
@@ -103,15 +127,8 @@ const ei_impulse_t impulse_12_10 = {
     .tflite_output_score_tensor = 0,
     .tflite_output_data_tensor = 0,
 
-    .tflite_arena_size = 11468,
-    .tflite_input_datatype = EI_CLASSIFIER_DATATYPE_INT8,
-    .tflite_input_quantized = 1,
-    .tflite_input_scale = 0.038505394011735916,
-    .tflite_input_zeropoint = -19,
-    .tflite_output_datatype = EI_CLASSIFIER_DATATYPE_INT8,
-    .tflite_output_quantized = 1,
-    .tflite_output_scale = 0.00390625,
-    .tflite_output_zeropoint = -128,
+    .learning_blocks_size =  namespace_12_10::ei_learning_blocks_size,
+    .learning_blocks = namespace_12_10::ei_learning_blocks,
 
     .inferencing_engine = EI_CLASSIFIER_TFLITE,
     .compiled = 0,
@@ -122,14 +139,6 @@ const ei_impulse_t impulse_12_10 = {
 
     .slice_size = (16000/4),
     .slices_per_model_window = 4,
-
-    .model_arr = namespace_12_10::trained_tflite,
-    .model_arr_size = namespace_12_10::trained_tflite_len,
-    .model_input = NULL,
-    .model_output = NULL,
-    .model_init = NULL,
-    .model_invoke = NULL,
-    .model_reset = NULL,
 
     .has_anomaly = 0,
     .label_count = 2,

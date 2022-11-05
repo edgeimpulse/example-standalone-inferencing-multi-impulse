@@ -27,7 +27,7 @@
 #include "edge-impulse-sdk/classifier/ei_model_types.h"
 
 #include "impulse_8_5.h"
-//#include "impulse_12_10.h"
+#include "impulse_12_10.h"
 
 const ei_impulse_t ei_default_impulse = impulse_8_5;
 const char** ei_classifier_inferencing_categories = ei_default_impulse.categories;

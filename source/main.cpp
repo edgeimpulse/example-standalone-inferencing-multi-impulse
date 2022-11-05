@@ -79,11 +79,11 @@ int main(int argc, char **argv) {
     // correct Predictions: idle: 0.00000 snake: 0.00000 updown: 0.99609 wave: 0.00000 Anomaly prediction: -0.358
 
     // new run_classifier call with impulse microphone
-    //signal.total_length = impulse_12_10.dsp_input_frame_size;;
-    //signal.get_data = &get_signal_data_mic;
-    //res = run_classifier(&impulse_12_10, &signal, &result, false);
-    //printf("run_classifier with mic impulse returned: %d\r\n", res);
-    //display_results(&result, &impulse_12_10);
+    signal.total_length = impulse_12_10.dsp_input_frame_size;;
+    signal.get_data = &get_signal_data_mic;
+    res = run_classifier(&impulse_12_10, &signal, &result, false);
+    printf("run_classifier with mic impulse returned: %d\r\n", res);
+    display_results(&result, &impulse_12_10);
     // correct Predictions: faucet: 0.75781 noise: 0.24219
 
     return 0;
