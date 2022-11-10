@@ -15,20 +15,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#ifndef _EDGE_IMPULSE_INFERENCING_ANOMALY_H_
-#define _EDGE_IMPULSE_INFERENCING_ANOMALY_H_
+#ifndef _EDGE_IMPULSE_ANOMALY_H_
+#define _EDGE_IMPULSE_ANOMALY_H_
 
-#if (EI_CLASSIFIER_HAS_ANOMALY == 1)
-
-#include <cmath>
-#include <stdlib.h>
 #include <stdio.h>
 #include <math.h>
 #include <stdint.h>
-
-#include "edge-impulse-sdk/classifier/ei_classifier_types.h"
-#include "edge-impulse-sdk/classifier/ei_aligned_malloc.h"
-#include "edge-impulse-sdk/porting/ei_classifier_porting.h"
+#include "model-parameters/anomaly_types.h"
 
 #ifdef __cplusplus
 namespace {
@@ -86,40 +79,4 @@ float get_min_distance_to_cluster(float *input, size_t input_size, const ei_clas
 }
 #endif // __cplusplus
 
-EI_IMPULSE_ERROR run_kmeans_anomaly(
-    const ei_impulse_t *impulse,
-    ei::matrix_t *fmatrix,
-    ei_impulse_result_t *result,
-    void *config_ptr,
-    bool debug = false)
-{
-
-    ei_learning_block_config_anomaly_kmeans_t config = *((ei_learning_block_config_anomaly_kmeans_t*)config_ptr);
-
-    uint64_t anomaly_start_ms = ei_read_timer_ms();
-
-    float input[config.anom_axes_size];
-    for (size_t ix = 0; ix < config.anom_axes_size; ix++) {
-        input[ix] = fmatrix->buffer[config.anom_axis[ix]];
-    }
-    standard_scaler(input, config.anom_scale, config.anom_mean, config.anom_axes_size);
-    float anomaly = get_min_distance_to_cluster(
-        input, config.anom_axes_size, config.anom_clusters, config.anom_cluster_count);
-
-    uint64_t anomaly_end_ms = ei_read_timer_ms();
-
-    if (debug) {
-        ei_printf("Anomaly score (time: %d ms.): ", static_cast<int>(anomaly_end_ms - anomaly_start_ms));
-        ei_printf_float(anomaly);
-        ei_printf("\n");
-    }
-
-    result->timing.anomaly = anomaly_end_ms - anomaly_start_ms;
-
-    result->anomaly = anomaly;
-
-    return EI_IMPULSE_OK;
-}
-
-#endif //#if (EI_CLASSIFIER_HAS_ANOMALY == 1)
-#endif // _EDGE_IMPULSE_INFERENCING_ANOMALY_H_
+#endif // _EDGE_IMPULSE_ANOMALY_H_

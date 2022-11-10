@@ -1,23 +1,18 @@
-/* Edge Impulse inferencing library
- * Copyright (c) 2021 EdgeImpulse Inc.
+/*
+ * Copyright (c) 2022 EdgeImpulse Inc.
  *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
  *
- * The above copyright notice and this permission notice shall be included in
- * all copies or substantial portions of the Software.
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an "AS
+ * IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
+ * express or implied. See the License for the specific language
+ * governing permissions and limitations under the License.
  *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
+ * SPDX-License-Identifier: Apache-2.0
  */
 
 #ifndef _EDGE_IMPULSE_RUN_DSP_H_
@@ -1244,7 +1239,7 @@ __attribute__((unused)) int extract_drpai_features_quantized(signal_t *signal, m
 
 __attribute__((unused)) int extract_image_features_quantized(const ei_impulse_t *impulse, signal_t *signal, matrix_i8_t *output_matrix, void *config_ptr, const float frequency) {
     ei_dsp_config_image_t config = *((ei_dsp_config_image_t*)config_ptr);
-/*
+
     int16_t channel_count = strcmp(config.channels, "Grayscale") == 0 ? 1 : 3;
 
     size_t output_ix = 0;
@@ -1273,7 +1268,7 @@ __attribute__((unused)) int extract_image_features_quantized(const ei_impulse_t 
             EIDSP_ERR(EIDSP_OUT_OF_MEM);
         }
         signal->get_data(ix, elements_to_read, input_matrix.buffer);
-
+/*
         for (size_t jx = 0; jx < elements_to_read; jx++) {
             uint32_t pixel = static_cast<uint32_t>(input_matrix.buffer[jx]);
 
@@ -1330,8 +1325,8 @@ __attribute__((unused)) int extract_image_features_quantized(const ei_impulse_t 
         }
 
         bytes_left -= elements_to_read;
-    }
 */
+    }
     return EIDSP_OK;
 }
 #endif // (EI_CLASSIFIER_TFLITE_INPUT_QUANTIZED == 1) && (EI_CLASSIFIER_INFERENCING_ENGINE != EI_CLASSIFIER_DRPAI)
@@ -1357,7 +1352,7 @@ __attribute__((unused)) int ei_dsp_clear_continuous_audio_state() {
  * @param      matrix      Source and destination matrix
  * @param      config_ptr  ei_dsp_config_mfcc_t struct pointer
  */
-static void calc_cepstral_mean_and_var_normalization_mfcc(ei_matrix *matrix, void *config_ptr)
+__attribute__((unused)) void calc_cepstral_mean_and_var_normalization_mfcc(ei_matrix *matrix, void *config_ptr)
 {
     ei_dsp_config_mfcc_t *config = (ei_dsp_config_mfcc_t *)config_ptr;
 
@@ -1385,7 +1380,7 @@ static void calc_cepstral_mean_and_var_normalization_mfcc(ei_matrix *matrix, voi
  * @param      matrix      Source and destination matrix
  * @param      config_ptr  ei_dsp_config_mfe_t struct pointer
  */
-static void calc_cepstral_mean_and_var_normalization_mfe(ei_matrix *matrix, void *config_ptr)
+__attribute__((unused)) void calc_cepstral_mean_and_var_normalization_mfe(ei_matrix *matrix, void *config_ptr)
 {
     ei_dsp_config_mfe_t *config = (ei_dsp_config_mfe_t *)config_ptr;
 
@@ -1423,7 +1418,7 @@ static void calc_cepstral_mean_and_var_normalization_mfe(ei_matrix *matrix, void
  * @param      matrix      Source and destination matrix
  * @param      config_ptr  ei_dsp_config_spectrogram_t struct pointer
  */
-static void calc_cepstral_mean_and_var_normalization_spectrogram(ei_matrix *matrix, void *config_ptr)
+__attribute__((unused)) void calc_cepstral_mean_and_var_normalization_spectrogram(ei_matrix *matrix, void *config_ptr)
 {
     ei_dsp_config_spectrogram_t *config = (ei_dsp_config_spectrogram_t *)config_ptr;
 

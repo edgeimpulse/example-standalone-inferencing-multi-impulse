@@ -1,33 +1,48 @@
-/* Edge Impulse inferencing library
+/*
  * Copyright (c) 2022 EdgeImpulse Inc.
  *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
  *
- * The above copyright notice and this permission notice shall be included in
- * all copies or substantial portions of the Software.
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an "AS
+ * IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
+ * express or implied. See the License for the specific language
+ * governing permissions and limitations under the License.
  *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
+ * SPDX-License-Identifier: Apache-2.0
  */
 
 #ifndef _EI_CLASSIFIER_FILL_RESULT_STRUCT_H_
 #define _EI_CLASSIFIER_FILL_RESULT_STRUCT_H_
 
+using namespace ei;
+
 #include "model-parameters/model_metadata.h"
 #if EI_CLASSIFIER_HAS_MODEL_VARIABLES == 1
 #include "model-parameters/model_variables.h"
 #endif
+#include "edge-impulse-sdk/classifier/ei_model_types.h"
+#include "edge-impulse-sdk/classifier/ei_classifier_types.h"
 
+#ifndef EI_HAS_OBJECT_DETECTION
+    #if (EI_CLASSIFIER_OBJECT_DETECTION_LAST_LAYER == EI_CLASSIFIER_LAST_LAYER_SSD)
+    #define EI_HAS_SSD 1
+    #endif
+    #if (EI_CLASSIFIER_OBJECT_DETECTION_LAST_LAYER == EI_CLASSIFIER_LAST_LAYER_FOMO)
+    #define EI_HAS_FOMO 1
+    #endif
+    #if (EI_CLASSIFIER_OBJECT_DETECTION_LAST_LAYER == EI_CLASSIFIER_LAST_LAYER_YOLOV5) || (EI_CLASSIFIER_OBJECT_DETECTION_LAST_LAYER == EI_CLASSIFIER_LAST_LAYER_YOLOV5_V5_DRPAI)
+    #define EI_HAS_YOLOV5 1
+    #endif
+    #if (EI_CLASSIFIER_OBJECT_DETECTION_LAST_LAYER == EI_CLASSIFIER_LAST_LAYER_YOLOX)
+    #define EI_HAS_YOLOX 1
+    #endif
+#endif
+
+#ifdef EI_HAS_FOMO
 typedef struct cube {
     size_t x;
     size_t y;
@@ -71,7 +86,6 @@ __attribute__((unused)) static bool ei_cube_check_overlap(ei_classifier_cube_t *
     if (confidence > c->confidence) {
         c->confidence = confidence;
     }
-
     return true;
 }
 
@@ -163,8 +177,10 @@ __attribute__((unused)) static void fill_result_struct_from_cubes(ei_impulse_res
     result->bounding_boxes = results.data();
     result->bounding_boxes_count = results.size();
 }
+#endif
 
 __attribute__((unused)) static void fill_result_struct_f32_fomo(const ei_impulse_t *impulse, ei_impulse_result_t *result, float *data, int out_width, int out_height) {
+#ifdef EI_HAS_FOMO
     std::vector<ei_classifier_cube_t*> cubes;
 
     int out_width_factor = impulse->input_width / out_width;
@@ -183,9 +199,11 @@ __attribute__((unused)) static void fill_result_struct_f32_fomo(const ei_impulse
     }
 
     fill_result_struct_from_cubes(result, &cubes, out_width_factor, impulse->object_detection_count);
+#endif
 }
 
 __attribute__((unused)) static void fill_result_struct_i8_fomo(const ei_impulse_t *impulse, ei_impulse_result_t *result, int8_t *data, float zero_point, float scale, int out_width, int out_height) {
+#ifdef EI_HAS_FOMO
     std::vector<ei_classifier_cube_t*> cubes;
 
     int out_width_factor = impulse->input_width / out_width;
@@ -205,6 +223,7 @@ __attribute__((unused)) static void fill_result_struct_i8_fomo(const ei_impulse_
     }
 
     fill_result_struct_from_cubes(result, &cubes, out_width_factor, impulse->object_detection_count);
+#endif
 }
 
 /**
@@ -212,6 +231,7 @@ __attribute__((unused)) static void fill_result_struct_i8_fomo(const ei_impulse_
  * (we don't support quantized here a.t.m.)
  */
 __attribute__((unused)) static void fill_result_struct_f32_object_detection(const ei_impulse_t *impulse, ei_impulse_result_t *result, float *data, float *scores, float *labels, bool debug) {
+#ifdef EI_HAS_SSD
     static std::vector<ei_impulse_result_bounding_box_t> results;
     results.clear();
     results.resize(impulse->object_detection_count);
@@ -266,6 +286,7 @@ __attribute__((unused)) static void fill_result_struct_f32_object_detection(cons
     }
     result->bounding_boxes = results.data();
     result->bounding_boxes_count = results.size();
+#endif
 }
 
 /**
@@ -306,7 +327,12 @@ __attribute__((unused)) static void fill_result_struct_f32(const ei_impulse_t *i
   * Fill the result structure from an unquantized output tensor
   * (we don't support quantized here a.t.m.)
   */
-__attribute__((unused)) static void fill_result_struct_f32_yolov5(const ei_impulse_t *impulse, ei_impulse_result_t *result, float *data, size_t output_features_count) {
+__attribute__((unused)) static void fill_result_struct_f32_yolov5(const ei_impulse_t *impulse,
+                                                                  ei_impulse_result_t *result,
+                                                                  int version,
+                                                                  float *data,
+                                                                  size_t output_features_count) {
+#ifdef EI_HAS_YOLOV5
     static std::vector<ei_impulse_result_bounding_box_t> results;
     results.clear();
 
@@ -352,10 +378,18 @@ __attribute__((unused)) static void fill_result_struct_f32_yolov5(const ei_impul
         if (score >= impulse->object_detection_threshold && score <= 1.0f) {
             ei_impulse_result_bounding_box_t r;
             r.label = impulse->categories[label];
-            r.x = static_cast<uint32_t>(x * static_cast<float>(impulse->input_width));
-            r.y = static_cast<uint32_t>(y * static_cast<float>(impulse->input_height));
-            r.width = static_cast<uint32_t>(w * static_cast<float>(impulse->input_width));
-            r.height = static_cast<uint32_t>(h * static_cast<float>(impulse->input_height));
+
+            if (version != 5) {
+                x *= static_cast<float>(impulse->input_width);
+                y *= static_cast<float>(impulse->input_height);
+                w *= static_cast<float>(impulse->input_width);
+                h *= static_cast<float>(impulse->input_height);
+            }
+
+            r.x = static_cast<uint32_t>(x);
+            r.y = static_cast<uint32_t>(y);
+            r.width = static_cast<uint32_t>(w);
+            r.height = static_cast<uint32_t>(h);
             r.value = score;
             results.push_back(r);
         }
@@ -363,7 +397,188 @@ __attribute__((unused)) static void fill_result_struct_f32_yolov5(const ei_impul
 
     result->bounding_boxes = results.data();
     result->bounding_boxes_count = results.size();
+#endif
 }
 
+/**
+  * Fill the result structure from an unquantized output tensor
+  * (we don't support quantized here a.t.m.)
+  */
+__attribute__((unused)) static void fill_result_struct_f32_yolox(const ei_impulse_t *impulse, ei_impulse_result_t *result, float *data, size_t output_features_count) {
+#ifdef EI_HAS_YOLOX
+    static std::vector<ei_impulse_result_bounding_box_t> results;
+    results.clear();
+
+    // START: def yolox_postprocess()
+
+    // if not p6:
+    //     strides = [8, 16, 32]
+    // else:
+    //     strides = [8, 16, 32, 64]
+    const std::vector<int> strides { 8, 16, 32 };
+
+    // hsizes = [img_size[0] // stride for stride in strides]
+    // wsizes = [img_size[1] // stride for stride in strides]
+    std::vector<int> hsizes(strides.size());
+    std::vector<int> wsizes(strides.size());
+    for (int ix = 0; ix < strides.size(); ix++) {
+        hsizes[ix] = (int)floor((float)impulse->input_width / (float)strides[ix]);
+        wsizes[ix] = (int)floor((float)impulse->input_height / (float)strides[ix]);
+    }
+
+    // for hsize, wsize, stride in zip(hsizes, wsizes, strides):
+    //      grid = np.stack((xv, yv), 2).reshape(1, -1, 2)
+    //      grids.append(grid)
+    //      shape = grid.shape[:2]
+    //      expanded_strides.append(np.full((*shape, 1), stride))
+    std::vector<matrix_i32_t*> grids;
+    std::vector<matrix_i32_t*> expanded_strides;
+
+    for (int ix = 0; ix < strides.size(); ix++) {
+        int hsize = hsizes.at(ix);
+        int wsize = wsizes.at(ix);
+        int stride = strides.at(ix);
+
+        // xv, yv = np.meshgrid(np.arange(wsize), np.arange(hsize))
+        // grid = np.stack((xv, yv), 2).reshape(1, -1, 2)
+        matrix_i32_t *grid = new matrix_i32_t(hsize * wsize, 2);
+        int grid_ix = 0;
+        for (int h = 0; h < hsize; h++) {
+            for (int w = 0; w < wsize; w++) {
+                grid->buffer[grid_ix + 0] = w;
+                grid->buffer[grid_ix + 1] = h;
+                grid_ix += 2;
+            }
+        }
+        grids.push_back(grid);
+
+        // shape = grid.shape[:2]
+        // expanded_strides.append(np.full((*shape, 1), stride))
+        matrix_i32_t *expanded_stride = new matrix_i32_t(hsize * wsize, 1);
+        for (int ix = 0; ix < hsize * wsize; ix++) {
+            expanded_stride->buffer[ix] = stride;
+        }
+        expanded_strides.push_back(expanded_stride);
+    }
+
+    // grids = np.concatenate(grids, 1)
+    int total_grid_rows = 0;
+    for (auto g : grids) {
+        total_grid_rows += g->rows;
+    }
+    matrix_i32_t c_grid(total_grid_rows, 2);
+    int c_grid_ix = 0;
+    for (auto g : grids) {
+        for (int row = 0; row < g->rows; row++) {
+            c_grid.buffer[c_grid_ix + 0] = g->buffer[(row * 2) + 0];
+            c_grid.buffer[c_grid_ix + 1] = g->buffer[(row * 2) + 1];
+            c_grid_ix += 2;
+        }
+        delete g;
+    }
+
+    // expanded_strides = np.concatenate(expanded_strides, 1)
+    int total_stride_rows = 0;
+    for (auto g : expanded_strides) {
+        total_stride_rows += g->rows;
+    }
+    matrix_i32_t c_expanded_strides(total_stride_rows, 1);
+    int c_expanded_strides_ix = 0;
+    for (auto g : expanded_strides) {
+        for (int row = 0; row < g->rows; row++) {
+            c_expanded_strides.buffer[c_expanded_strides_ix + 0] = g->buffer[(row * 1) + 0];
+            c_expanded_strides_ix += 1;
+        }
+        delete g;
+    }
+
+    const int output_rows = output_features_count / (5 + impulse->label_count);
+    matrix_t outputs(output_rows, 5 + impulse->label_count, data);
+    for (int row = 0; row < outputs.rows; row++) {
+        float v0 = outputs.buffer[(row * outputs.cols) + 0];
+        float v1 = outputs.buffer[(row * outputs.cols) + 1];
+        float v2 = outputs.buffer[(row * outputs.cols) + 2];
+        float v3 = outputs.buffer[(row * outputs.cols) + 3];
+
+        float cgrid0 = (float)c_grid.buffer[(row * c_grid.cols) + 0];
+        float cgrid1 = (float)c_grid.buffer[(row * c_grid.cols) + 1];
+
+        float stride = (float)c_expanded_strides.buffer[row];
+
+        // outputs[..., :2] = (outputs[..., :2] + grids) * expanded_strides
+        outputs.buffer[(row * outputs.cols) + 0] = (v0 + cgrid0) * stride;
+        outputs.buffer[(row * outputs.cols) + 1] = (v1 + cgrid1) * stride;
+
+        // outputs[..., 2:4] = np.exp(outputs[..., 2:4]) * expanded_strides
+        outputs.buffer[(row * outputs.cols) + 2] = exp(v2) * stride;
+        outputs.buffer[(row * outputs.cols) + 3] = exp(v3) * stride;
+    }
+
+    // END: def yolox_postprocess()
+
+    // boxes = predictions[:, :4]
+    matrix_t boxes(outputs.rows, 4);
+    for (int row = 0; row < outputs.rows; row++) {
+        boxes.buffer[(row * boxes.cols) + 0] = outputs.buffer[(row * outputs.cols) + 0];
+        boxes.buffer[(row * boxes.cols) + 1] = outputs.buffer[(row * outputs.cols) + 1];
+        boxes.buffer[(row * boxes.cols) + 2] = outputs.buffer[(row * outputs.cols) + 2];
+        boxes.buffer[(row * boxes.cols) + 3] = outputs.buffer[(row * outputs.cols) + 3];
+    }
+
+    // scores = predictions[:, 4:5] * predictions[:, 5:]
+    matrix_t scores(outputs.rows, impulse->label_count);
+    for (int row = 0; row < outputs.rows; row++) {
+        float confidence = outputs.buffer[(row * outputs.cols) + 4];
+        for (int cc = 0; cc < impulse->label_count; cc++) {
+            scores.buffer[(row * scores.cols) + cc] = confidence * outputs.buffer[(row * outputs.cols) + (5 + cc)];
+        }
+    }
+
+    // iterate through scores to see if we have anything with confidence
+    for (int row = 0; row < scores.rows; row++) {
+        for (int col = 0; col < scores.cols; col++) {
+            float confidence = scores.buffer[(row * scores.cols) + col];
+
+            if (confidence >= impulse->object_detection_threshold && confidence <= 1.0f) {
+                ei_impulse_result_bounding_box_t r;
+                r.label = impulse->categories[col];
+                r.value = confidence;
+
+                // now find the box...
+                float xcenter = boxes.buffer[(row * boxes.cols) + 0];
+                float ycenter = boxes.buffer[(row * boxes.cols) + 1];
+                float width = boxes.buffer[(row * boxes.cols) + 2];
+                float height = boxes.buffer[(row * boxes.cols) + 3];
+
+                int x = (int)(xcenter - (width / 2.0f));
+                int y = (int)(ycenter - (height / 2.0f));
+
+                if (x < 0) {
+                    x = 0;
+                }
+                if (x > impulse->input_width) {
+                    x = impulse->input_width;
+                }
+                if (y < 0) {
+                    y = 0;
+                }
+                if (y > impulse->input_height) {
+                    y = impulse->input_height;
+                }
+
+                r.x = x;
+                r.y = y;
+                r.width = (int)round(width);
+                r.height = (int)round(height);
+
+                results.push_back(r);
+            }
+        }
+    }
+
+    result->bounding_boxes = results.data();
+    result->bounding_boxes_count = results.size();
+#endif // EI_HAS_YOLOX
+}
 
 #endif // _EI_CLASSIFIER_FILL_RESULT_STRUCT_H_
