@@ -24,67 +24,21 @@ int main(int argc, char **argv) {
     ei_impulse_result_t result; // Used to store inference output
     EI_IMPULSE_ERROR res;       // Return code from inference
 
-    // old run_classifier call with default impulse
-    signal.total_length = EI_CLASSIFIER_DSP_INPUT_FRAME_SIZE;
-    signal.get_data = &get_signal_data_acc;
-
-    // Perform DSP pre-processing and inference
-    res = run_classifier(&signal, &result, false);
-
-    // Print return code and how long it took to perform inference
-    ei_printf("run_classifier returned: %d\r\n", res);
-    ei_printf("Timing: DSP %d ms, inference %d ms, anomaly %d ms\r\n",
-            result.timing.dsp,
-            result.timing.classification,
-            result.timing.anomaly);
-
-    // Print the prediction results (object detection)
-#if EI_CLASSIFIER_OBJECT_DETECTION == 1
-    ei_printf("Object detection bounding boxes:\r\n");
-    for (uint32_t i = 0; i < EI_CLASSIFIER_OBJECT_DETECTION_COUNT; i++) {
-        ei_impulse_result_bounding_box_t bb = result.bounding_boxes[i];
-        if (bb.value == 0) {
-            continue;
-        }
-        ei_printf("  %s (%f) [ x: %u, y: %u, width: %u, height: %u ]\r\n",
-                bb.label,
-                bb.value,
-                bb.x,
-                bb.y,
-                bb.width,
-                bb.height);
-    }
-
-    // Print the prediction results (classification)
-#else
-    ei_printf("Predictions:\r\n");
-    for (uint16_t i = 0; i < EI_CLASSIFIER_LABEL_COUNT; i++) {
-        ei_printf("  %s: ", ei_classifier_inferencing_categories[i]);
-        ei_printf("%.5f\r\n", result.classification[i].value);
-    }
-#endif
-
-    // Print anomaly result (if it exists)
-#if EI_CLASSIFIER_HAS_ANOMALY == 1
-    ei_printf("Anomaly prediction: %.3f\r\n", result.anomaly);
-#endif
-    // correct Predictions: idle: 0.00000 snake: 0.00000 updown: 0.99609 wave: 0.00000 Anomaly prediction: -0.358
-
     // new run_classifier call with impulse accelerometer
-    signal.total_length = impulse_8_5.dsp_input_frame_size;
+    signal.total_length = impulse_129038_98.dsp_input_frame_size;
     signal.get_data = &get_signal_data_acc;
-    res = run_classifier(&impulse_8_5, &signal, &result, false);
+    res = run_classifier(&impulse_129038_98, &signal, &result, false);
     printf("run_classifier with acc impulse returned: %d\r\n", res);
-    display_results(&result, &impulse_8_5);
-    // correct Predictions: idle: 0.00000 snake: 0.00000 updown: 0.99609 wave: 0.00000 Anomaly prediction: -0.358
+    display_results(&result, &impulse_129038_98);
+    // correct Predictions: idle: 0.00000 snake: 0.00000 updown: 0.99609 wave: 0.00000 Anomaly prediction: -0.308
 
     // new run_classifier call with impulse microphone
-    signal.total_length = impulse_12_10.dsp_input_frame_size;;
+    signal.total_length = impulse_91810_25.dsp_input_frame_size;;
     signal.get_data = &get_signal_data_mic;
-    res = run_classifier(&impulse_12_10, &signal, &result, false);
+    res = run_classifier(&impulse_91810_25, &signal, &result, false);
     printf("run_classifier with mic impulse returned: %d\r\n", res);
-    display_results(&result, &impulse_12_10);
-    // correct Predictions: faucet: 0.75781 noise: 0.24219
+    display_results(&result, &impulse_91810_25);
+    // correct Predictions:   no: 0.00391 unknown: 0.83594 yes: 0.16016
 
     return 0;
 }
